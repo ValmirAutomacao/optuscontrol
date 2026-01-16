@@ -1,0 +1,29 @@
+# Dependências
+node_modules/
+backend/venv/
+backend/.venv/
+__pycache__/
+*.pyc
+
+# Builds
+frontend/dist/
+dist/
+
+# Segredos e Configurações (CRÍTICO)
+.env
+.env.local
+.env.*.local
+frontend/.env
+backend/.env
+frontend/.env.local
+backend/.env.local
+
+# IDEs e OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Mobile (Capacitor)
+frontend/android/
+frontend/ios/
