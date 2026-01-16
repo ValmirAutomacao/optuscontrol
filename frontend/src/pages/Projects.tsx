@@ -137,7 +137,7 @@ export function Projects() {
         const cep = formData.zip_code.replace(/\D/g, '')
         if (cep.length !== 8) return
 
-        setCepLoading(true)
+        _setCepLoading(true)
         try {
             const res = await fetch(`https://viacep.com.br/ws/${cep}/json/`)
             const data = await res.json()
@@ -153,7 +153,7 @@ export function Projects() {
         } catch (e) {
             console.error('Erro ao buscar CEP:', e)
         } finally {
-            setCepLoading(false)
+            _setCepLoading(false)
         }
     }
     function openCreateModal() {
