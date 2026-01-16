@@ -1,4 +1,5 @@
 import { createContext, useContext, useState, useEffect, type ReactNode } from 'react'
+import type { User, Session } from '@supabase/supabase-js'
 import { useAuth } from './useAuth'
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1'
@@ -29,6 +30,8 @@ interface PermissionsContextType {
     activeCompanyId: string | null
     isDeveloper: boolean
     loading: boolean
+    user: User | null
+    session: Session | null
     can: (module: string, action: 'create' | 'read' | 'update' | 'delete' | 'export') => boolean
     switchCompany: (companyId: string) => Promise<boolean>
     refreshPermissions: () => Promise<void>
@@ -147,6 +150,8 @@ export function PermissionsProvider({ children }: { children: ReactNode }) {
             activeCompanyId,
             isDeveloper,
             loading,
+            user,
+            session,
             can,
             switchCompany,
             refreshPermissions

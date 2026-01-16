@@ -5,7 +5,6 @@ import {
     Receipt,
     Wallet,
     Tags,
-    Download,
     HelpCircle,
     Settings,
     LogOut,

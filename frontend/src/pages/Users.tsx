@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Users as UsersIcon, UserPlus, Mail, Shield, Check, X, Loader, Search, Phone } from 'lucide-react'
+import { UserPlus, Mail, Shield, X, Loader } from 'lucide-react'
 import { useAuth } from '../hooks/useAuth'
 import { usePermissions } from '../hooks/usePermissions'
 import './Users.css'

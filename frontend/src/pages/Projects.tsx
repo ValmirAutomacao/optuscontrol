@@ -49,7 +49,7 @@ export function Projects() {
         city: '',
         state: ''
     })
-    const [cepLoading, setCepLoading] = useState(false)
+    const [_cepLoading, _setCepLoading] = useState(false)
 
     useEffect(() => {
         if (activeCompanyId && session?.access_token) {

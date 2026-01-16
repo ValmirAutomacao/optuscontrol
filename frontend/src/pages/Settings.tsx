@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Building2, Save, Users, Shield, MapPin, Phone, FileText, User } from 'lucide-react'
+import { Building2, Users, Shield, MapPin, Phone, FileText, User } from 'lucide-react'
 import { useAuth } from '../hooks/useAuth'
 import { usePermissions } from '../hooks/usePermissions'
 import './Settings.css'
