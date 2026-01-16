@@ -7,20 +7,7 @@
         },
         {
             "source": "/(.*)",
-            "destination": "/$1"
-        }
-    ],
-    "builds": [
-        {
-            "src": "api/index.py",
-            "use": "@vercel/python"
-        },
-        {
-            "src": "package.json",
-            "use": "@vercel/static-build",
-            "config": {
-                "distDir": "dist"
-            }
+            "destination": "/index.html"
         }
     ]
 }
