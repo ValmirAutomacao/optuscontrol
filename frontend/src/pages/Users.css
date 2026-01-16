@@ -1,0 +1,156 @@
+.members-section {
+    background: white;
+    padding: 24px;
+    border-radius: 12px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+}
+
+.section-title {
+    font-size: 1.1rem;
+    color: #1a1a2e;
+    margin-bottom: 20px;
+    font-weight: 600;
+}
+
+.users-list {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: 16px;
+}
+
+.user-card {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 16px;
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    transition: all 0.2s;
+}
+
+.user-card:hover {
+    border-color: #4361EE;
+    transform: translateY(-2px);
+}
+
+.user-card.pending {
+    border-style: dashed;
+    background: #fff;
+}
+
+.user-info {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.user-avatar {
+    width: 40px;
+    height: 40px;
+    background: #4361EE;
+    color: white;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 600;
+    text-transform: uppercase;
+}
+
+.user-avatar.pending {
+    background: #f1f5f9;
+    color: #64748b;
+}
+
+.user-info h3 {
+    font-size: 0.95rem;
+    margin: 0;
+    color: #1a1a2e;
+}
+
+.user-info span {
+    font-size: 0.8rem;
+    color: #64748b;
+}
+
+.user-role-badge {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 10px;
+    background: #e0e7ff;
+    color: #4361EE;
+    border-radius: 99px;
+    font-size: 0.75rem;
+    font-weight: 600;
+}
+
+.user-status {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.75rem;
+    color: #10b981;
+}
+
+.status-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+}
+
+.status-dot.active {
+    background: #10b981;
+}
+
+.user-status.pending {
+    color: #f59e0b;
+}
+
+.invite-notice {
+    padding: 12px;
+    background: #fff9eb;
+    border: 1px solid #fee2e2;
+    border-radius: 6px;
+    margin: 16px 0;
+}
+
+.invite-notice p {
+    font-size: 0.85rem;
+    color: #92400e;
+    margin: 0;
+}
+
+.empty-list {
+    text-align: center;
+    color: #64748b;
+    padding: 20px;
+    grid-column: 1 / -1;
+}
+
+.modules-selection {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    padding: 12px;
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    margin-top: 8px;
+}
+
+.checkbox-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.85rem;
+    color: #4a5568;
+    cursor: pointer;
+}
+
+.checkbox-item input {
+    width: 16px;
+    height: 16px;
+    cursor: pointer;
+}

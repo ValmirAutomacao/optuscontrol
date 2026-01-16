@@ -1,0 +1,205 @@
+.payables-summary {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 16px;
+    margin-bottom: 24px;
+}
+
+.summary-card {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    background: var(--bg-card);
+    border-radius: var(--radius-xl);
+    padding: 20px;
+    border: 1px solid var(--border-light);
+}
+
+.summary-card--warning {
+    border-left: 4px solid var(--error-red);
+}
+
+.summary-card--warning svg {
+    color: var(--error-red);
+}
+
+.summary-card--info {
+    border-left: 4px solid var(--primary-blue);
+}
+
+.summary-card--info svg {
+    color: var(--primary-blue);
+}
+
+.summary-value {
+    display: block;
+    font-size: 24px;
+    font-weight: 700;
+    color: var(--text-primary);
+}
+
+.summary-label {
+    font-size: 14px;
+    color: var(--text-secondary);
+}
+
+/* Filter Tabs */
+.filter-tabs {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 20px;
+    background: var(--bg-card);
+    padding: 6px;
+    border-radius: var(--radius-lg);
+    border: 1px solid var(--border-light);
+    width: fit-content;
+}
+
+.filter-tab {
+    padding: 10px 16px;
+    border: none;
+    background: transparent;
+    border-radius: var(--radius-md);
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--text-secondary);
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.filter-tab:hover {
+    color: var(--text-primary);
+}
+
+.filter-tab.active {
+    background: var(--primary-blue);
+    color: white;
+}
+
+/* List */
+.payables-list {
+    background: var(--bg-card);
+    border-radius: var(--radius-xl);
+    border: 1px solid var(--border-light);
+    overflow: hidden;
+}
+
+.list-loading,
+.list-empty {
+    padding: 60px 24px;
+    text-align: center;
+    color: var(--text-secondary);
+}
+
+.list-empty svg {
+    color: var(--text-muted);
+    margin-bottom: 16px;
+}
+
+.list-empty h3 {
+    font-size: 18px;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin-bottom: 8px;
+}
+
+/* Payable Item */
+.payable-item {
+    display: grid;
+    grid-template-columns: 2fr 1fr 1fr auto;
+    gap: 20px;
+    align-items: center;
+    padding: 20px;
+    border-bottom: 1px solid var(--border-light);
+    transition: background 0.2s ease;
+}
+
+.payable-item:last-child {
+    border-bottom: none;
+}
+
+.payable-item:hover {
+    background: rgba(67, 97, 238, 0.02);
+}
+
+.payable-item--overdue {
+    background: rgba(239, 68, 68, 0.03);
+}
+
+.payable-item--overdue:hover {
+    background: rgba(239, 68, 68, 0.06);
+}
+
+.payable-main h4 {
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin-bottom: 4px;
+}
+
+.payable-main p {
+    font-size: 13px;
+    color: var(--text-muted);
+}
+
+.payable-date {
+    text-align: center;
+}
+
+.date-label {
+    display: block;
+    font-size: 11px;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin-bottom: 4px;
+}
+
+.date-value {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.payable-item--overdue .date-value {
+    color: var(--error-red);
+}
+
+.payable-amount {
+    font-size: 18px;
+    font-weight: 700;
+    color: var(--text-primary);
+    text-align: right;
+}
+
+.payable-actions {
+    display: flex;
+    justify-content: flex-end;
+    min-width: 100px;
+}
+
+.btn-pay {
+    background: var(--primary-blue);
+    color: white;
+    border: none;
+    padding: 8px 16px;
+    border-radius: var(--radius-md);
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.btn-pay:hover {
+    background: var(--primary-blue-dark);
+    transform: translateY(-1px);
+}
+
+.status-paid {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    color: var(--success-green);
+    font-size: 14px;
+    font-weight: 600;
+}

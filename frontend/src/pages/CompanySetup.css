@@ -1,0 +1,253 @@
+.setup-container {
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: linear-gradient(135deg, #0f0f23 0%, #1a1a2e 50%, #16213e 100%);
+    padding: 20px;
+}
+
+.setup-card {
+    background: #1a1a2e;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 20px;
+    width: 100%;
+    max-width: 500px;
+    padding: 40px;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+}
+
+.setup-card.error-card,
+.setup-card.success-card {
+    text-align: center;
+}
+
+.setup-card.error-card svg {
+    color: #F87171;
+    margin-bottom: 20px;
+}
+
+.setup-card.success-card svg {
+    color: #10B981;
+    margin-bottom: 20px;
+}
+
+.setup-card h1 {
+    color: white;
+    font-size: 24px;
+    margin-bottom: 12px;
+}
+
+.setup-card>p {
+    color: #888;
+    margin-bottom: 24px;
+}
+
+.setup-header {
+    text-align: center;
+    margin-bottom: 30px;
+}
+
+.logo {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    margin-bottom: 20px;
+}
+
+.logo svg {
+    color: #4361EE;
+}
+
+.logo span {
+    font-size: 20px;
+    font-weight: 700;
+    color: white;
+}
+
+.setup-header h1 {
+    margin-bottom: 8px;
+}
+
+.setup-header p {
+    color: #888;
+    font-size: 15px;
+}
+
+/* Company Info */
+.company-info {
+    background: rgba(67, 97, 238, 0.1);
+    border: 1px solid rgba(67, 97, 238, 0.2);
+    border-radius: 12px;
+    padding: 20px;
+    margin-bottom: 30px;
+}
+
+.company-info h3 {
+    color: #4361EE;
+    font-size: 14px;
+    font-weight: 600;
+    margin-bottom: 16px;
+    text-transform: uppercase;
+}
+
+.info-grid {
+    display: grid;
+    gap: 12px;
+}
+
+.info-item {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.info-item .label {
+    font-size: 12px;
+    color: #888;
+}
+
+.info-item .value {
+    font-size: 14px;
+    color: white;
+    font-weight: 500;
+}
+
+/* Form */
+.setup-form h3 {
+    color: white;
+    font-size: 16px;
+    margin-bottom: 20px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.form-group {
+    margin-bottom: 20px;
+}
+
+.form-group label {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 14px;
+    color: #aaa;
+    margin-bottom: 8px;
+}
+
+.form-group label svg {
+    width: 16px;
+    height: 16px;
+}
+
+.form-group input {
+    width: 100%;
+    padding: 14px 16px;
+    background: rgba(255, 255, 255, 0.1);
+    /* Aumentado de 0.05 para 0.1 */
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    /* Aumentado de 0.1 para 0.2 */
+    border-radius: 10px;
+    color: #ffffff;
+    /* Branco puro */
+    font-size: 15px;
+    transition: all 0.2s;
+}
+
+.form-group input:focus {
+    border-color: #4361EE;
+    outline: none;
+    background: rgba(255, 255, 255, 0.15);
+    box-shadow: 0 0 0 4px rgba(67, 97, 238, 0.2);
+}
+
+.form-group input:disabled {
+    background: rgba(255, 255, 255, 0.02);
+    color: #888;
+    cursor: not-allowed;
+}
+
+.form-group small {
+    display: block;
+    margin-top: 6px;
+    font-size: 12px;
+    color: #666;
+}
+
+.error-message {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 12px 16px;
+    background: rgba(239, 68, 68, 0.1);
+    border: 1px solid rgba(239, 68, 68, 0.3);
+    border-radius: 10px;
+    color: #F87171;
+    font-size: 14px;
+    margin-bottom: 20px;
+}
+
+.btn-primary {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 14px 28px;
+    background: linear-gradient(135deg, #4361EE, #7C3AED);
+    border: none;
+    border-radius: 10px;
+    color: white;
+    font-size: 16px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.btn-primary:hover {
+    opacity: 0.9;
+    transform: translateY(-1px);
+}
+
+.btn-primary:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    transform: none;
+}
+
+.btn-full {
+    width: 100%;
+}
+
+.setup-footer {
+    margin-top: 24px;
+    text-align: center;
+}
+
+.setup-footer p {
+    font-size: 12px;
+    color: #666;
+}
+
+/* Spinner */
+.spinner {
+    animation: spin 1s linear infinite;
+    color: #4361EE;
+    margin-bottom: 16px;
+}
+
+@keyframes spin {
+    from {
+        transform: rotate(0deg);
+    }
+
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+@media (max-width: 480px) {
+    .setup-card {
+        padding: 24px;
+    }
+}

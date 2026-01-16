@@ -1,0 +1,1641 @@
+﻿PRD Completo: Hub de Conformidade Contábil
+Sistema de Gestão Financeira e Conformidade para Licitações
+
+1. Visão Geral
+1.1 Objetivo
+Sistema mobile-first para empresas de engenharia organizarem documentação fiscal e financeira, gerarem balanços patrimoniais e DREs, e garantirem conformidade para licitações públicas (Leis 14.133/21 e 8.666/93).
+1.2 Problema Resolvido
+
+Desorganização documental: Notas fiscais, cupons e medições dispersos
+Desclassificação em licitações: Falta de índices de liquidez adequados
+Gargalo contador-empresa: Informações chegam tarde ou incompletas
+Despesas de campo: Cupons fiscais perdidos, sem controle
+
+1.3 Público-Alvo Primário
+
+Empresas de engenharia (cliente pagante)
+Contadores (usuário estratégico - vitrine do produto)
+Gestores de obra (usuário operacional)
+
+
+2. Stack Tecnológica (Claude Code + VS Code)
+2.1 Arquitetura
+┌─────────────────────────────────────────────┐
+│          Frontend (React + Vite)            │
+│  - Web Dashboard (Admin/Contador)          │
+│  - Mobile App (Capacitor - iOS/Android)    │
+└──────────────────┬──────────────────────────┘
+                   │ API REST
+┌──────────────────▼──────────────────────────┐
+│       Backend (Python + FastAPI)            │
+│  - Parser XML (NF-e)                        │
+│  - OCR Cupons (Gemini Vision)               │
+│  - Cálculo de Índices                       │
+│  - Exportações Contábeis                    │
+└──────────────────┬──────────────────────────┘
+                   │
+┌──────────────────▼──────────────────────────┐
+│         Supabase (BaaS)                     │
+│  - PostgreSQL (Dados)                       │
+│  - Auth (JWT + RLS)                         │
+│  - Storage (Fotos/XMLs/PDFs)                │
+│  - Realtime (WebSockets)                    │
+└─────────────────────────────────────────────┘
+2.2 Tecnologias Específicas
+CamadaTecnologiaJustificativaFrontend WebReact 18 + Vite + Tailwind CSSPerformance + DX rápidoFrontend MobileCapacitor 6App nativo real (câmera, storage offline)BackendPython 3.11 + FastAPIParsing XML, OCR, cálculos financeirosBanco de DadosSupabase (PostgreSQL 15)Auth + DB + Storage + RealtimeIA/OCRGoogle Gemini 2.0 FlashOCR de cupons fiscaisAutomaçãon8n (self-hosted)Buscar certidões, alertas, webhooksMonitoramentoSentryLogs de erro em produção
+2.3 Bibliotecas Python Essenciais
+python# Backend (requirements.txt)
+fastapi==0.109.0
+uvicorn[standard]==0.27.0
+supabase==2.3.0
+python-multipart==0.0.6
+google-generativeai==0.3.2  # Gemini
+lxml==5.1.0                  # Parse XML
+pandas==2.2.0                # Manipulação de dados
+openpyxl==3.1.2              # Excel
+pydantic==2.5.0              # Validação
+python-dotenv==1.0.0
+
+3. Arquitetura de Dados (PostgreSQL via Supabase)
+3.1 Entidades Principais
+sql-- ====================================
+-- 1. MULTI-TENANCY & AUTENTICAÇÃO
+-- ====================================
+
+-- Tabela de empresas (tenant principal)
+CREATE TABLE companies (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  name TEXT NOT NULL,
+  cnpj TEXT UNIQUE NOT NULL,
+  email TEXT,
+  phone TEXT,
+  address JSONB, -- {street, city, state, zip}
+  subscription_plan TEXT DEFAULT 'trial', -- trial, basic, pro
+  is_active BOOLEAN DEFAULT true,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Tabela de usuários (estende auth.users do Supabase)
+CREATE TABLE user_profiles (
+  id UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
+  company_id UUID REFERENCES companies(id) ON DELETE CASCADE,
+  full_name TEXT NOT NULL,
+  role TEXT NOT NULL, -- admin, accountant, operator, viewer
+  avatar_url TEXT,
+  is_active BOOLEAN DEFAULT true,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- ====================================
+-- 2. OBRAS/PROJETOS
+-- ====================================
+
+CREATE TABLE projects (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  company_id UUID REFERENCES companies(id) ON DELETE CASCADE,
+  name TEXT NOT NULL,
+  code TEXT, -- Código interno da obra
+  client_name TEXT,
+  start_date DATE,
+  end_date DATE,
+  status TEXT DEFAULT 'active', -- active, paused, completed
+  budget DECIMAL(15,2),
+  created_by UUID REFERENCES auth.users(id),
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- ====================================
+-- 3. NOTAS FISCAIS (NF-e)
+-- ====================================
+
+CREATE TABLE invoices (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  company_id UUID REFERENCES companies(id) ON DELETE CASCADE,
+  project_id UUID REFERENCES projects(id), -- Pode ser NULL (despesa geral)
+  
+  -- Dados do XML
+  access_key TEXT UNIQUE, -- Chave de acesso da NF-e (44 dígitos)
+  number TEXT NOT NULL,
+  series TEXT,
+  xml_file_url TEXT, -- Storage URL no Supabase
+  xml_content TEXT, -- XML completo (para auditorias)
+  
+  -- Emissor (fornecedor)
+  supplier_cnpj TEXT NOT NULL,
+  supplier_name TEXT NOT NULL,
+  supplier_state TEXT,
+  
+  -- Valores
+  issue_date DATE NOT NULL,
+  total_products DECIMAL(15,2),
+  total_services DECIMAL(15,2),
+  total_value DECIMAL(15,2) NOT NULL,
+  icms_value DECIMAL(15,2) DEFAULT 0,
+  ipi_value DECIMAL(15,2) DEFAULT 0,
+  
+  -- Controle
+  status TEXT DEFAULT 'pending', -- pending, processed, error, cancelled
+  error_message TEXT,
+  processed_at TIMESTAMPTZ,
+  created_by UUID REFERENCES auth.users(id),
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Itens da nota fiscal
+CREATE TABLE invoice_items (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  invoice_id UUID REFERENCES invoices(id) ON DELETE CASCADE,
+  item_number INT NOT NULL,
+  description TEXT NOT NULL,
+  ncm TEXT, -- Nomenclatura Comum do Mercosul
+  quantity DECIMAL(15,3),
+  unit TEXT,
+  unit_value DECIMAL(15,2),
+  total_value DECIMAL(15,2) NOT NULL,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- ====================================
+-- 4. CONTAS A PAGAR
+-- ====================================
+
+CREATE TABLE payables (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  company_id UUID REFERENCES companies(id) ON DELETE CASCADE,
+  project_id UUID REFERENCES projects(id),
+  invoice_id UUID REFERENCES invoices(id), -- NULL se for cupom ou provisão
+  
+  -- Dados da parcela
+  description TEXT NOT NULL,
+  supplier_name TEXT NOT NULL,
+  supplier_cnpj TEXT,
+  due_date DATE NOT NULL,
+  amount DECIMAL(15,2) NOT NULL,
+  
+  -- Pagamento
+  payment_date DATE,
+  payment_amount DECIMAL(15,2),
+  payment_method TEXT, -- pix, boleto, transferencia, dinheiro
+  payment_proof_url TEXT, -- Comprovante no Storage
+  
+  -- Classificação contábil
+  account_category TEXT, -- Ex: "Despesas com Pessoal", "Materiais"
+  cost_center TEXT, -- Ex: "Obra 123", "Administrativo"
+  
+  -- Controle
+  status TEXT DEFAULT 'pending', -- pending, paid, overdue, cancelled
+  is_provision BOOLEAN DEFAULT false, -- Se veio de uma medição
+  notes TEXT,
+  created_by UUID REFERENCES auth.users(id),
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- ====================================
+-- 5. CUPONS FISCAIS (OCR)
+-- ====================================
+
+CREATE TABLE receipts (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  company_id UUID REFERENCES companies(id) ON DELETE CASCADE,
+  project_id UUID REFERENCES projects(id),
+  
+  -- Imagem original
+  image_url TEXT NOT NULL, -- Storage URL
+  
+  -- Dados extraídos via OCR
+  establishment_name TEXT,
+  establishment_cnpj TEXT,
+  receipt_date DATE,
+  total_amount DECIMAL(15,2),
+  items JSONB, -- Array de {description, quantity, unit_price, total}
+  
+  -- Controle
+  ocr_status TEXT DEFAULT 'pending', -- pending, processed, error, manual
+  ocr_confidence DECIMAL(3,2), -- 0.00 a 1.00
+  ocr_raw_response JSONB, -- Resposta completa do Gemini
+  
+  -- Vínculo contábil
+  payable_id UUID REFERENCES payables(id), -- Gerado após confirmação
+  is_validated BOOLEAN DEFAULT false,
+  validated_by UUID REFERENCES auth.users(id),
+  validated_at TIMESTAMPTZ,
+  
+  created_by UUID REFERENCES auth.users(id),
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- ====================================
+-- 6. MEDIÇÕES E PROVISÕES
+-- ====================================
+
+CREATE TABLE provisions (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  company_id UUID REFERENCES companies(id) ON DELETE CASCADE,
+  project_id UUID REFERENCES projects(id) NOT NULL,
+  
+  -- Dados da medição
+  description TEXT NOT NULL, -- Ex: "Locação Retroescavadeira"
+  supplier_name TEXT NOT NULL,
+  supplier_cnpj TEXT,
+  
+  measurement_date DATE NOT NULL,
+  quantity DECIMAL(15,3),
+  unit TEXT, -- Ex: "horas", "m³", "unidade"
+  unit_price DECIMAL(15,2),
+  total_estimated DECIMAL(15,2) NOT NULL,
+  
+  -- Vínculo com NF (quando chegar)
+  invoice_id UUID REFERENCES invoices(id),
+  payable_id UUID REFERENCES payables(id),
+  
+  -- Controle
+  status TEXT DEFAULT 'pending_invoice', -- pending_invoice, matched, cancelled
+  matched_at TIMESTAMPTZ,
+  match_confidence DECIMAL(3,2), -- Confiança do match automático
+  notes TEXT,
+  
+  created_by UUID REFERENCES auth.users(id),
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- ====================================
+-- 7. CONTAS A RECEBER
+-- ====================================
+
+CREATE TABLE receivables (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  company_id UUID REFERENCES companies(id) ON DELETE CASCADE,
+  project_id UUID REFERENCES projects(id),
+  
+  description TEXT NOT NULL,
+  client_name TEXT NOT NULL,
+  client_cnpj TEXT,
+  invoice_number TEXT,
+  
+  due_date DATE NOT NULL,
+  amount DECIMAL(15,2) NOT NULL,
+  
+  receipt_date DATE,
+  receipt_amount DECIMAL(15,2),
+  receipt_proof_url TEXT,
+  
+  status TEXT DEFAULT 'pending', -- pending, received, overdue, cancelled
+  created_by UUID REFERENCES auth.users(id),
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- ====================================
+-- 8. PLANO DE CONTAS (Contabilidade)
+-- ====================================
+
+CREATE TABLE chart_of_accounts (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  company_id UUID REFERENCES companies(id), -- NULL = conta padrão para todos
+  
+  code TEXT NOT NULL, -- Ex: "1.1.01.001"
+  name TEXT NOT NULL,
+  account_type TEXT NOT NULL, -- ativo, passivo, receita, despesa, patrimonio
+  parent_id UUID REFERENCES chart_of_accounts(id), -- Hierarquia
+  is_analytical BOOLEAN DEFAULT true, -- Analítica (recebe lançamentos)
+  
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  UNIQUE(company_id, code)
+);
+
+-- ====================================
+-- 9. LANÇAMENTOS CONTÁBEIS
+-- ====================================
+
+CREATE TABLE accounting_entries (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  company_id UUID REFERENCES companies(id) ON DELETE CASCADE,
+  
+  entry_date DATE NOT NULL,
+  description TEXT NOT NULL,
+  
+  -- Origem do lançamento
+  source_type TEXT, -- invoice, receipt, payable, receivable, manual
+  source_id UUID, -- ID da tabela de origem
+  
+  -- Débito e Crédito
+  debit_account_id UUID REFERENCES chart_of_accounts(id),
+  credit_account_id UUID REFERENCES chart_of_accounts(id),
+  amount DECIMAL(15,2) NOT NULL,
+  
+  -- Controle
+  is_automatic BOOLEAN DEFAULT false, -- Gerado pelo sistema
+  created_by UUID REFERENCES auth.users(id),
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- ====================================
+-- 10. DOCUMENTOS E CERTIDÕES
+-- ====================================
+
+CREATE TABLE documents (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  company_id UUID REFERENCES companies(id) ON DELETE CASCADE,
+  
+  document_type TEXT NOT NULL, -- cnd_federal, cnd_estadual, cnd_municipal, crf, balanco, dre
+  file_url TEXT NOT NULL, -- Storage URL
+  file_name TEXT NOT NULL,
+  
+  issue_date DATE,
+  expiration_date DATE,
+  status TEXT DEFAULT 'valid', -- valid, expiring, expired
+  
+  -- Metadata
+  metadata JSONB, -- Dados específicos do documento
+  
+  created_by UUID REFERENCES auth.users(id),
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- ====================================
+-- 11. ÍNDICES DE LIQUIDEZ (Cache)
+-- ====================================
+
+CREATE TABLE financial_indicators (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  company_id UUID REFERENCES companies(id) ON DELETE CASCADE,
+  
+  reference_date DATE NOT NULL, -- Data de referência do cálculo
+  
+  -- Balanço Patrimonial
+  current_assets DECIMAL(15,2), -- Ativo Circulante
+  non_current_assets DECIMAL(15,2), -- Ativo Não Circulante
+  total_assets DECIMAL(15,2),
+  
+  current_liabilities DECIMAL(15,2), -- Passivo Circulante
+  non_current_liabilities DECIMAL(15,2), -- Passivo Não Circulante
+  total_liabilities DECIMAL(15,2),
+  
+  equity DECIMAL(15,2), -- Patrimônio Líquido
+  
+  -- DRE
+  gross_revenue DECIMAL(15,2),
+  net_revenue DECIMAL(15,2),
+  operating_expenses DECIMAL(15,2),
+  net_profit DECIMAL(15,2),
+  
+  -- Índices Calculados
+  current_liquidity DECIMAL(5,2), -- LC = AC / PC
+  general_liquidity DECIMAL(5,2), -- LG = (AC + ANC) / (PC + PNC)
+  equity_degree DECIMAL(5,2), -- GE = (PC + PNC) / PL
+  
+  -- Status para licitações
+  is_bidding_ready BOOLEAN DEFAULT false,
+  bidding_status_notes TEXT,
+  
+  calculated_at TIMESTAMPTZ DEFAULT NOW(),
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  UNIQUE(company_id, reference_date)
+);
+
+-- ====================================
+-- 12. AUDITORIA (Logs de Ações)
+-- ====================================
+
+CREATE TABLE audit_logs (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  company_id UUID REFERENCES companies(id) ON DELETE CASCADE,
+  user_id UUID REFERENCES auth.users(id),
+  
+  action TEXT NOT NULL, -- created, updated, deleted, exported
+  table_name TEXT NOT NULL,
+  record_id UUID,
+  old_values JSONB,
+  new_values JSONB,
+  
+  ip_address INET,
+  user_agent TEXT,
+  
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+3.2 Row Level Security (RLS) - Políticas de Segurança
+sql-- Habilitar RLS em todas as tabelas
+ALTER TABLE companies ENABLE ROW LEVEL SECURITY;
+ALTER TABLE user_profiles ENABLE ROW LEVEL SECURITY;
+ALTER TABLE projects ENABLE ROW LEVEL SECURITY;
+ALTER TABLE invoices ENABLE ROW LEVEL SECURITY;
+ALTER TABLE payables ENABLE ROW LEVEL SECURITY;
+ALTER TABLE receipts ENABLE ROW LEVEL SECURITY;
+ALTER TABLE provisions ENABLE ROW LEVEL SECURITY;
+ALTER TABLE receivables ENABLE ROW LEVEL SECURITY;
+ALTER TABLE accounting_entries ENABLE ROW LEVEL SECURITY;
+ALTER TABLE documents ENABLE ROW LEVEL SECURITY;
+ALTER TABLE financial_indicators ENABLE ROW LEVEL SECURITY;
+
+-- Política: Usuário só acessa dados da própria empresa
+CREATE POLICY "Users can only access their company data"
+ON companies
+FOR ALL
+USING (
+  id IN (
+    SELECT company_id FROM user_profiles 
+    WHERE id = auth.uid()
+  )
+);
+
+-- Aplicar a mesma lógica para todas as tabelas com company_id
+CREATE POLICY "Isolate data by company"
+ON invoices FOR ALL
+USING (
+  company_id IN (
+    SELECT company_id FROM user_profiles WHERE id = auth.uid()
+  )
+);
+
+-- (Repetir para: projects, payables, receipts, provisions, receivables, etc.)
+3.3 Índices para Performance
+sql-- Índices estratégicos
+CREATE INDEX idx_invoices_company ON invoices(company_id);
+CREATE INDEX idx_invoices_supplier ON invoices(supplier_cnpj);
+CREATE INDEX idx_invoices_date ON invoices(issue_date);
+CREATE INDEX idx_invoices_access_key ON invoices(access_key);
+
+CREATE INDEX idx_payables_company_status ON payables(company_id, status);
+CREATE INDEX idx_payables_due_date ON payables(due_date);
+CREATE INDEX idx_payables_invoice ON payables(invoice_id);
+
+CREATE INDEX idx_receipts_company ON receipts(company_id);
+CREATE INDEX idx_receipts_status ON receipts(ocr_status);
+
+CREATE INDEX idx_provisions_project ON provisions(project_id);
+CREATE INDEX idx_provisions_status ON provisions(status);
+
+CREATE INDEX idx_accounting_date ON accounting_entries(entry_date);
+CREATE INDEX idx_accounting_company ON accounting_entries(company_id);
+
+-- Índice GIN para pesquisa em JSONB
+CREATE INDEX idx_receipts_items_gin ON receipts USING GIN (items);
+```
+
+---
+
+## 4. Módulos Funcionais (Detalhamento)
+
+### 4.1 Módulo A: Captura e OCR de Cupons Fiscais
+
+#### Fluxo:
+```
+[App Mobile] Foto do cupom
+      ↓
+[Backend FastAPI] Recebe imagem → Envia para Gemini Vision
+      ↓
+[Gemini API] Retorna JSON estruturado
+      ↓
+[Backend] Valida e salva em receipts (status: pending)
+      ↓
+[Dashboard] Contador/Admin revisa e aprova
+      ↓
+[Sistema] Gera payable vinculado
+Endpoint FastAPI:
+python# /api/receipts/ocr
+@router.post("/ocr")
+async def process_receipt_ocr(
+    file: UploadFile,
+    project_id: str,
+    current_user: User = Depends(get_current_user)
+):
+    # 1. Upload para Supabase Storage
+    file_url = await upload_to_storage(file)
+    
+    # 2. OCR via Gemini
+    ocr_result = await gemini_extract_receipt(file_url)
+    
+    # 3. Salvar no banco
+    receipt = await db.receipts.insert({
+        "company_id": current_user.company_id,
+        "project_id": project_id,
+        "image_url": file_url,
+        "establishment_name": ocr_result["establishment"],
+        "total_amount": ocr_result["total"],
+        "ocr_confidence": ocr_result["confidence"],
+        "ocr_status": "processed"
+    })
+    
+    return receipt
+Prompt do Gemini:
+pythonRECEIPT_OCR_PROMPT = """
+Analise esta imagem de cupom fiscal e extraia as seguintes informações em formato JSON:
+
+{
+  "establishment_name": "Nome do estabelecimento",
+  "establishment_cnpj": "CNPJ (se visível)",
+  "receipt_date": "Data no formato YYYY-MM-DD",
+  "total_amount": 0.00,
+  "items": [
+    {
+      "description": "Descrição do item",
+      "quantity": 1,
+      "unit_price": 0.00,
+      "total": 0.00
+    }
+  ],
+  "payment_method": "Forma de pagamento",
+  "confidence": 0.95
+}
+
+Se algum campo não estiver legível, use null. 
+Priorize precisão sobre completude.
+"""
+```
+
+---
+
+### 4.2 Módulo B: Parser de XML (NF-e) e Contas a Pagar
+
+#### Fluxo:
+```
+[Dashboard Web] Upload do arquivo XML
+      ↓
+[Backend FastAPI] Parse XML com lxml
+      ↓
+[Validação] Verifica estrutura, chave de acesso
+      ↓
+[Extração] Lê tags: <emit>, <dest>, <det>, <total>, <cobr>
+      ↓
+[Banco] Salva em: invoices + invoice_items + payables
+      ↓
+[Realtime] Dashboard atualiza via WebSocket
+Estrutura do Parser:
+pythonfrom lxml import etree
+
+class NFeParser:
+    def __init__(self, xml_content: str):
+        self.root = etree.fromstring(xml_content.encode())
+        self.ns = {"nfe": "http://www.portalfiscal.inf.br/nfe"}
+    
+    def extract_supplier(self) -> dict:
+        emit = self.root.find(".//nfe:emit", self.ns)
+        return {
+            "cnpj": emit.find("nfe:CNPJ", self.ns).text,
+            "name": emit.find("nfe:xNome", self.ns).text,
+            "state": emit.find(".//nfe:UF", self.ns).text
+        }
+    
+    def extract_totals(self) -> dict:
+        total = self.root.find(".//nfe:total/nfe:ICMSTot", self.ns)
+        return {
+            "products": float(total.find("nfe:vProd", self.ns).text),
+            "services": 0.0,  # Se houver tag específica
+            "total": float(total.find("nfe:vNF", self.ns).text)
+        }
+    
+    def extract_items(self) -> list:
+        items = []
+        for det in self.root.findall(".//nfe:det", self.ns):
+            prod = det.find("nfe:prod", self.ns)
+            items.append({
+                "number": int(det.get("nItem")),
+                "description": prod.find("nfe:xProd", self.ns).text,
+                "ncm": prod.find("nfe:NCM", self.ns).text,
+                "quantity": float(prod.find("nfe:qCom", self.ns).text),
+                "unit": prod.find("nfe:uCom", self.ns).text,
+                "unit_value": float(prod.find("nfe:vUnCom", self.ns).text),
+                "total": float(prod.find("nfe:vProd", self.ns).text)
+            })
+        return items
+    
+    def extract_payables(self) -> list:
+        """Extrai duplicatas (parcelas)"""
+        payables = []
+        for dup in self.root.findall(".//nfe:dup", self.ns):
+            payables.append({
+                "number": dup.find("nfe:nDup", self.ns).text,
+                "due_date": dup.find("nfe:dVenc", self.ns).text,
+                "amount": float(dup.find("nfe:vDup", self.ns).text)
+            })
+        return payables
+Endpoint FastAPI:
+python@router.post("/invoices/upload")
+async def upload_invoice_xml(
+    file: UploadFile,
+    project_id: Optional[str] = None,
+    current_user: User = Depends(get_current_user)
+):
+    # 1. Ler XML
+    xml_content = await file.read()
+    
+    # 2. Parse
+    parser = NFeParser(xml_content.decode())
+    supplier = parser.extract_supplier()
+    totals = parser.extract_totals()
+    items = parser.extract_items()
+    payables = parser.extract_payables()
+    
+    # 3. Salvar no banco (transação)
+    async with db.transaction():
+        # 3.1 Invoice
+        invoice = await db.invoices.insert({
+            "company_id": current_user.company_id,
+            "project_id": project_id,
+            "access_key": parser.access_key,
+            "xml_content": xml_content.decode(),
+            "supplier_cnpj": supplier["cnpj"],
+            "supplier_name": supplier["name"],
+            "total_value": totals["total"],
+            "status": "processed"
+        })
+        
+        # 3.2 Items
+        for item in items:
+            await db.invoice_items.insert({
+                "invoice_id": invoice.id,
+                **item
+            })
+        
+        # 3.3 Payables (Contas a Pagar)
+        for payable in payables:
+            await db.payables.insert({
+                "company_id": current_user.company_id,
+                "project_id": project_id,
+                "invoice_id": invoice.id,
+                "description": f"NF {invoice.number} - {supplier['name']}",
+                "supplier_name": supplier["name"],
+                "supplier_cnpj": supplier["cnpj"],
+                "due_date": payable["due_date"],
+                "amount": payable["amount"],
+                "status": "pending"
+            })
+    
+    return {"invoice_id": invoice.id, "payables_created": len(payables)}
+```
+
+---
+
+### 4.3 Módulo C: Medições, Provisões e Matching de NF
+
+#### Fluxo de Criação de Provisão:
+```
+[App Mobile] Operador lança medição
+      ↓
+[Backend] Cria registro em provisions (status: pending_invoice)
+      ↓
+[Sistema] Gera payable com flag is_provision=true
+```
+
+#### Fluxo de Matching Automático:
+```
+[Sistema] Nova NF-e processada
+      ↓
+[Backend] Busca provisões pendentes do mesmo CNPJ e período
+      ↓
+[Algoritmo] Calcula % de similaridade (valor, fornecedor, período)
+      ↓
+[Dashboard] Sugere vinculação (se confiança > 80%)
+      ↓
+[Contador] Aprova ou ajusta manualmente
+      ↓
+[Sistema] Atualiza provision.status = 'matched'
+Algoritmo de Matching:
+pythonasync def auto_match_provision_to_invoice(invoice_id: str):
+    invoice = await db.invoices.get(invoice_id)
+    
+    # Buscar provisões pendentes do mesmo fornecedor
+    provisions = await db.provisions.select(
+        company_id=invoice.company_id,
+        supplier_cnpj=invoice.supplier_cnpj,
+        status="pending_invoice"
+    )
+    
+    matches = []
+    for provision in provisions:
+        confidence = 0.0
+        
+        # 1. CNPJ exato (+40%)
+        if provision.supplier_cnpj == invoice.supplier_cnpj:
+            confidence += 0.40
+        
+        # 2. Valor próximo (±5%) (+30%)
+        value_diff = abs(provision.total_estimated - invoice.total_value)
+        if value_diff / invoice.total_value <= 0.05:
+            confidence += 0.30
+        
+        # 3. Período (mesma semana) (+20%)
+        date_diff = abs((provision.measurement_date - invoice.issue_date).days)
+        if date_diff <= 7:
+            confidence += 0.20
+        
+        # 4. Descrição similar (+10%)
+        if fuzz.partial_ratio(provision.description, invoice.supplier_name) > 70:
+            confidence += 0.10
+        
+        if confidence >= 0.80:
+            matches.append({
+                "provision_id": provision.id,
+                "confidence": confidence
+            })
+    
+    return matches
+
+4.4 Módulo D: Cálculo de Índices e Análise de Conformidade
+Índices Calculados:
+python# Liquidez Corrente (LC)
+LC = Ativo_Circulante / Passivo_Circulante
+# Regra: LC >= 1.0 para licitações
+
+# Liquidez Geral (LG)
+LG = (Ativo_Circulante + Ativo_Não_Circulante) / 
+     (Passivo_Circulante + Passivo_Não_Circulante)
+# Regra: LG >= 1.0 para licitações
+
+# Grau de Endividamento (GE)
+GE = (Passivo_Circulante + Passivo_Não_Circulante) / Patrimônio_Líquido
+# Regra: GE <= 1.0 (quanto menor, melhor)
+Endpoint de Cálculo:
+python@router.post("/indicators/calculate")
+async def calculate_financial_indicators(
+    reference_date: date,
+    current_user: User = Depends(get_current_user)
+):
+    company_id = current_user.company_id
+    
+    # 1. Buscar dados do Balanço
+    assets = await get_balance_sheet_assets(company_id, reference_date)
+    liabilities = await get_balance_sheet_liabilities(company_id, reference_date)
+    equity = await get_equity(company_id, reference_date)
+    
+    # 2. Calcular índices
+    indicators = {
+        "current_assets": assets["current"],
+        "non_current_assets": assets["non_current"],
+        "total_assets": assets["total"],
+        
+        "current_liabilities": liabilities["current"],
+        "non_current_liabilities": liabilities["non_current"],
+        "total_liabilities": liabilities["total"],
+        
+        "equity": equity,
+        
+        "current_liquidity": assets["current"] / liabilities["current"] if liabilities["current"] > 0 else 0,
+        "general_liquidity": (assets["current"] + assets["non_current"]) / 
+                             (liabilities["current"] + liabilities["non_current"]) if (liabilities["current"] + liabilities["non_current"]) > 0 else 0,
+        "equity_degree": (liabilities["current"] + liabilities["non_current"]) / equity if equity > 0 else 0
+    }
+    
+    # 3. Verificar conformidade para licitações
+    is_ready = (
+        indicators["current_liquidity"] >= 1.0 and
+        indicators["general_liquidity"] >= 1.0 and
+        indicators["equity_degree"] <= 1.0
+    )
+    
+    indicators["is_bidding_ready"] = is_ready
+    indicators["bidding_status_notes"] = generate_status_notes(indicators)
+    
+    # 4. Salvar no cache
+    await db.financial_indicators.upsert(
+        company_id=company_id,
+        reference_date=reference_date,
+        **indicators
+    )
+    
+    return indicators
+
+def generate_status_notes(indicators: dict) -> str:
+    """Gera mensagem humanizada sobre conformidade"""
+    issues = []
+    
+    if indicators["current_liquidity"] < 1.0:
+        issues.append(f"❌ Liquidez Corrente: {indicators['current_liquidity']:.2f} (mínimo: 1.0)")
+    else:
+        issues.append(f"✅ Liquidez Corrente: {indicators['current_liquidity']:.2f}")
+    
+    if indicators["general_liquidity"] < 1.0:
+        issues.append(f"❌ Liquidez Geral: {indicators['general_liquidity']:.2f} (mínimo: 1.0)")
+    else:
+        issues.append(f"✅ Liquidez Geral: {indicators['general_liquidity']:.2f}")
+    
+    if indicators["equity_degree"] > 1.0:
+        issues.append(f"⚠️ Grau de Endividamento: {indicators['equity_degree']:.2f} (máximo recomendado: 1.0)")
+    else:
+        issues.append(f"✅ Grau de Endividamento: {indicators['equity_degree']:.2f}")
+    
+    return "\n".join(issues)
+
+4.5 Módulo E: Exportações Contábeis (Multi-Formato)
+Formatos Suportados:
+1. CSV Genérico (Estrutura Universal)
+csvData,Histórico,Conta Débito,Conta Crédito,Valor,Documento
+2024-01-15,Compra de materiais - NF 12345,Materiais (1.1.04),Fornecedores (2.1.01),5000.00,NF-12345
+```
+
+**2. Excel (XLSX) - Mais Rico**
+- Múltiplas abas: Lançamentos, Contas a Pagar, DRE, Balanço
+- Formatação condicional (vencidos em vermelho)
+- Gráficos automáticos
+
+**3. SPED Contábil (ECD) - Formato Oficial**
+```
+|0000|014|0|01012024|31122024|EMPRESA EXEMPLO LTDA|12345678000190|...
+|I050|01012024|31122024|EMPRESA EXEMPLO LTDA|12345678000190|...
+|J100|1|1.1.01.001|Caixa|A|S|...
+```
+
+**4. SPED Fiscal (EFD-ICMS/IPI)**
+```
+|0000|013|0|01012024|31122024|...
+|C100|0|1|12345|55|00|1|...
+|C170|1|PRODUTO X|123456|UN|10.00|100.00|...
+5. OFX (Open Financial Exchange)
+xml<OFX>
+  <BANKMSGSRSV1>
+    <STMTTRNRS>
+      <STMTRS>
+        <BANKTRANLIST>
+          <STMTTRN>
+            <TRNTYPE>DEBIT</TRNTYPE>
+            <DTPOSTED>20240115</DTPOSTED>
+            <TRNAMT>-5000.00</TRNAMT>
+            <MEMO>Compra materiais NF 12345</MEMO>
+          </STMTTRN>
+        </BANKTRANLIST>
+      </STMTRS>
+    </STMTTRNRS>
+  </BANKMSGSRSV1>
+</OFX>
+Implementação - Classe Base de Exportação:
+pythonfrom abc import ABC, abstractmethod
+import pandas as pd
+from typing import List, Dict
+
+class BaseExporter(ABC):
+    def __init__(self, company_id: str, start_date: date, end_date: date):
+        self.company_id = company_id
+        self.start_date = start_date
+        self.end_date = end_date
+    
+    async def get_data(self) -> pd.DataFrame:
+        """Busca lançamentos contábeis do período"""
+        entries = await db.accounting_entries.select(
+            company_id=self.company_id,
+            entry_date__gte=self.start_date,
+            entry_date__lte=self.end_date
+        )
+        return pd.DataFrame(entries)
+    
+    @abstractmethod
+    async def export(self) -> bytes:
+        """Implementado por cada formato específico"""
+        pass
+
+class CSVExporter(BaseExporter):
+    async def export(self) -> bytes:
+        df = await self.get_data()
+        
+        # Formatação específica CSV
+        output = df[["entry_date", "description", "debit_account", 
+                     "credit_account", "amount"]].copy()
+        output.columns = ["Data", "Histórico", "Conta Débito", 
+                          "Conta Crédito", "Valor"]
+        
+        return output.to_csv(index=False).encode("utf-8")
+
+class ExcelExporter(BaseExporter):
+    async def export(self) -> bytes:
+        df = await self.get_data()
+        
+        # Criar arquivo Excel com múltiplas abas
+        output = BytesIO()
+        with pd.ExcelWriter(output, engine='openpyxl') as writer:
+            # Aba 1: Lançamentos
+            df.to_excel(writer, sheet_name="Lançamentos", index=False)
+            
+            # Aba 2: Contas a Pagar
+            payables = await self.get_payables()
+            payables.to_excel(writer, sheet_name="Contas a Pagar", index=False)
+            
+            # Aba 3: DRE
+            dre = await self.generate_dre()
+            dre.to_excel(writer, sheet_name="DRE", index=False)
+        
+        output.seek(0)
+        return output.getvalue()
+
+class SPEDECDExporter(BaseExporter):
+    """Exportador para SPED Contábil (ECD)"""
+    async def export(self) -> bytes:
+        lines = []
+        
+        # Bloco 0: Abertura
+        lines.append(self.generate_block_0000())
+        lines.append(self.generate_block_0001())
+        
+        # Bloco I: Lançamentos
+        entries = await self.get_data()
+        for _, entry in entries.iterrows():
+            lines.append(self.generate_block_I200(entry))
+        
+        # Bloco 9: Encerramento
+        lines.append(self.generate_block_9999(len(lines)))
+        
+        return "\n".join(lines).encode("latin-1")
+    
+    def generate_block_0000(self) -> str:
+        # Estrutura do registro 0000 do SPED
+        company = db.companies.get(self.company_id)
+        return f"|0000|014|0|{self.start_date.strftime('%d%m%Y')}|" \
+               f"{self.end_date.strftime('%d%m%Y')}|{company.name}|" \
+               f"{company.cnpj}|..."
+
+class SPEDFiscalExporter(BaseExporter):
+    """Exportador para SPED Fiscal (EFD-ICMS/IPI)"""
+    async def export(self) -> bytes:
+        lines = []
+        
+        # Buscar NF-e do período
+        invoices = await db.invoices.select(
+            company_id=self.company_id,
+            issue_date__gte=self.start_date,
+            issue_date__lte=self.end_date
+        )
+        
+        # Bloco C: Documentos Fiscais
+        for invoice in invoices:
+            lines.append(self.generate_block_C100(invoice))
+            
+            # Itens da nota
+            items = await db.invoice_items.select(invoice_id=invoice.id)
+            for item in items:
+                lines.append(self.generate_block_C170(item))
+        
+        return "\n".join(lines).encode("latin-1")
+Endpoint Unificado de Exportação:
+python@router.post("/export/{format}")
+async def export_accounting_data(
+    format: str,  # csv, excel, sped_ecd, sped_fiscal, ofx
+    start_date: date,
+    end_date: date,
+    current_user: User = Depends(get_current_user)
+):
+    exporters = {
+        "csv": CSVExporter,
+        "excel": ExcelExporter,
+        "sped_ecd": SPEDECDExporter,
+        "sped_fiscal": SPEDFiscalExporter,
+        "ofx": OFXExporter
+    }
+    
+    if format not in exporters:
+        raise HTTPException(400, "Formato não suportado")
+    
+    exporter = exporters[format](
+        company_id=current_user.company_id,
+        start_date=start_date,
+        end_date=end_date
+    )
+    
+    file_content = await exporter.export()
+    
+    # Salvar no histórico de exportações
+    await db.audit_logs.insert({
+        "company_id": current_user.company_id,
+        "user_id": current_user.id,
+        "action": "exported",
+        "table_name": "accounting_entries",
+        "new_values": {"format": format, "period": f"{start_date} a {end_date}"}
+    })
+    
+    return Response(
+        content=file_content,
+        media_type="application/octet-stream",
+        headers={
+            "Content-Disposition": f"attachment; filename=export_{format}_{start_date}_{end_date}.{format}"
+        }
+    )
+```
+
+---
+
+## 5. Interface do Usuário (UI/UX)
+
+### 5.1 Dashboard Principal (Web)
+
+**Layout:**
+```
+┌─────────────────────────────────────────────────────────┐
+│  [Logo]  Hub de Conformidade    [Notificações] [Avatar] │
+├─────────────────────────────────────────────────────────┤
+│  Dashboard  │  Obras  │  Financeiro  │  Documentos  │   │
+├─────────────────────────────────────────────────────────┤
+│                                                          │
+│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐  │
+│  │ LC: 1.45 ✅  │  │ LG: 1.32 ✅  │  │ GE: 0.68 ✅  │  │
+│  │ Liquidez OK  │  │ Liquidez OK  │  │ Endiv. Baixo │  │
+│  └──────────────┘  └──────────────┘  └──────────────┘  │
+│                                                          │
+│  Status de Licitação: ✅ APTO                            │
+│  Última atualização: 14/01/2025 15:30                   │
+│                                                          │
+│  ┌────────────────────────────────────────────────────┐ │
+│  │ 📊 Contas a Pagar (Próximos 30 dias)              │ │
+│  ├────────────────────────────────────────────────────┤ │
+│  │ 15/01 - Fornecedor A - R$ 5.000,00  [Pagar]       │ │
+│  │ 18/01 - Fornecedor B - R$ 3.200,00  [Pagar]       │ │
+│  │ 22/01 - Fornecedor C - R$ 8.500,00  [Pagar]       │ │
+│  └────────────────────────────────────────────────────┘ │
+│                                                          │
+│  ┌────────────────────────────────────────────────────┐ │
+│  │ 📝 Pendências                                      │ │
+│  ├────────────────────────────────────────────────────┤ │
+│  │ • 3 cupons aguardando validação                   │ │
+│  │ • 2 provisões aguardando vinculação com NF        │ │
+│  │ • CND Federal vence em 15 dias                    │ │
+│  └────────────────────────────────────────────────────┘ │
+│                                                          │
+│  [Botão: + Nova Despesa]  [Botão: Upload XML]          │
+│  [Botão: Exportar Contabilidade]                        │
+└─────────────────────────────────────────────────────────┘
+```
+
+**Cores do Sistema:**
+- **Verde** (#10B981): Índices OK, status apto
+- **Vermelho** (#EF4444): Índices críticos, vencidos
+- **Amarelo** (#F59E0B): Alertas, vencendo em breve
+- **Azul** (#3B82F6): Informações, ações
+
+### 5.2 App Mobile (Capacitor)
+
+**Tela Inicial:**
+```
+┌────────────────────────┐
+│  🏗️ Obra: Centro ABC   │
+│  Status: ✅ Ativo      │
+├────────────────────────┤
+│                        │
+│  [Card: Foto de Cupom] │
+│  📷 Tirar Foto         │
+│                        │
+│  [Card: Upload NF]     │
+│  📄 Adicionar XML      │
+│                        │
+│  [Card: Nova Medição]  │
+│  📊 Registrar Uso      │
+│                        │
+├────────────────────────┤
+│  Últimas Despesas:     │
+│  • Combustível - R$ 200│
+│  • Almoço - R$ 150     │
+└────────────────────────┘
+```
+
+**Fluxo de OCR:**
+```
+[Câmera Nativa] → [Preview com Crop] → [Enviar]
+         ↓
+[Loading: "Processando..."] (3s)
+         ↓
+[Tela de Revisão:]
+┌────────────────────────┐
+│ Estabelecimento:       │
+│ POSTO XYZ ✏️          │
+│                        │
+│ Data: 14/01/2025 ✏️   │
+│                        │
+│ Valor: R$ 200,00 ✏️   │
+│                        │
+│ Confiança: 95% ✅      │
+│                        │
+│ [Aprovar] [Editar]     │
+└────────────────────────┘
+```
+
+### 5.3 Dashboard do Contador (Perfil Especial)
+
+**Recursos Exclusivos:**
+```
+┌─────────────────────────────────────────────────────────┐
+│  👤 Contador: João Silva (CRC 12345/RJ)                  │
+├─────────────────────────────────────────────────────────┤
+│  Empresas sob minha responsabilidade:                    │
+│                                                          │
+│  1️⃣ Construtora ABC Ltda (CNPJ: 12.345.678/0001-90)    │
+│     ├─ Pendências: 3 cupons para validar               │
+│     ├─ Status: ✅ Apto para licitação                   │
+│     └─ [Acessar] [Exportar SPED]                        │
+│                                                          │
+│  2️⃣ Engenharia XYZ S/A (CNPJ: 98.765.432/0001-10)      │
+│     ├─ Pendências: 1 NF sem classificação contábil     │
+│     ├─ Status: ⚠️ LC = 0.95 (abaixo do limite)         │
+│     └─ [Acessar] [Exportar CSV]                         │
+│                                                          │
+│  ┌────────────────────────────────────────────────────┐ │
+│  │ 🎯 Ações Rápidas                                   │ │
+│  ├────────────────────────────────────────────────────┤ │
+│  │ • Gerar SPED Contábil (todas empresas)            │ │
+│  │ • Relatório consolidado (mês atual)               │ │
+│  │ • Enviar lembretes de documentos vencendo         │ │
+│  └────────────────────────────────────────────────────┘ │
+└─────────────────────────────────────────────────────────┘
+```
+
+---
+
+## 6. Estrutura do Projeto (Claude Code)
+
+### 6.1 Estrutura de Pastas
+```
+hub-conformidade/
+│
+├── backend/                     # FastAPI (Python)
+│   ├── app/
+│   │   ├── __init__.py
+│   │   ├── main.py              # Entry point
+│   │   ├── config.py            # Variáveis de ambiente
+│   │   │
+│   │   ├── api/                 # Endpoints
+│   │   │   ├── __init__.py
+│   │   │   ├── deps.py          # Dependências (auth, db)
+│   │   │   ├── routes/
+│   │   │   │   ├── invoices.py  # Upload XML, listar NFs
+│   │   │   │   ├── receipts.py  # OCR, validar cupons
+│   │   │   │   ├── payables.py  # Contas a pagar
+│   │   │   │   ├── provisions.py # Medições
+│   │   │   │   ├── indicators.py # Cálculo de índices
+│   │   │   │   ├── export.py    # Exportações contábeis
+│   │   │   │   └── auth.py      # Login, registro
+│   │   │
+│   │   ├── core/                # Lógica de negócio
+│   │   │   ├── nfe_parser.py    # Parse de XML
+│   │   │   ├── ocr_service.py   # Integração Gemini
+│   │   │   ├── matching.py      # Algoritmo de matching
+│   │   │   ├── calculations.py  # Cálculos financeiros
+│   │   │   └── exporters/
+│   │   │       ├── base.py
+│   │   │       ├── csv_exporter.py
+│   │   │       ├── excel_exporter.py
+│   │   │       ├── sped_ecd.py
+│   │   │       └── sped_fiscal.py
+│   │   │
+│   │   ├── db/                  # Database
+│   │   │   ├── __init__.py
+│   │   │   ├── supabase_client.py
+│   │   │   └── models.py        # Pydantic models
+│   │   │
+│   │   ├── schemas/             # Request/Response schemas
+│   │   │   ├── invoice.py
+│   │   │   ├── receipt.py
+│   │   │   ├── payable.py
+│   │   │   └── user.py
+│   │   │
+│   │   └── utils/
+│   │       ├── validators.py
+│   │       ├── formatters.py
+│   │       └── storage.py       # Upload Supabase Storage
+│   │
+│   ├── tests/
+│   │   ├── test_nfe_parser.py
+│   │   ├── test_ocr.py
+│   │   └── test_exporters.py
+│   │
+│   ├── requirements.txt
+│   ├── .env.example
+│   └── README.md
+│
+├── frontend/                    # React + Vite
+│   ├── public/
+│   │   └── assets/
+│   │
+│   ├── src/
+│   │   ├── main.tsx             # Entry point
+│   │   ├── App.tsx
+│   │   │
+│   │   ├── components/          # Componentes reutilizáveis
+│   │   │   ├── ui/              # Shadcn/ui components
+│   │   │   │   ├── button.tsx
+│   │   │   │   ├── card.tsx
+│   │   │   │   ├── input.tsx
+│   │   │   │   └── ...
+│   │   │   │
+│   │   │   ├── Layout/
+│   │   │   │   ├── Sidebar.tsx
+│   │   │   │   ├── Header.tsx
+│   │   │   │   └── Footer.tsx
+│   │   │   │
+│   │   │   └── shared/
+│   │   │       ├── FileUpload.tsx
+│   │   │       ├── DatePicker.tsx
+│   │   │       └── ConfidenceBadge.tsx
+│   │   │
+│   │   ├── pages/               # Páginas principais
+│   │   │   ├── Dashboard.tsx
+│   │   │   ├── Invoices/
+│   │   │   │   ├── InvoiceList.tsx
+│   │   │   │   ├── InvoiceDetail.tsx
+│   │   │   │   └── InvoiceUpload.tsx
+│   │   │   ├── Receipts/
+│   │   │   │   ├── ReceiptList.tsx
+│   │   │   │   ├── ReceiptCapture.tsx
+│   │   │   │   └── ReceiptValidation.tsx
+│   │   │   ├── Payables/
+│   │   │   │   ├── PayableList.tsx
+│   │   │   │   └── PayableCalendar.tsx
+│   │   │   ├── Indicators/
+│   │   │   │   └── IndicatorsDashboard.tsx
+│   │   │   └── Export/
+│   │   │       └── ExportPage.tsx
+│   │   │
+│   │   ├── hooks/               # Custom hooks
+│   │   │   ├── useAuth.ts
+│   │   │   ├── useSupabase.ts
+│   │   │   ├── useFileUpload.ts
+│   │   │   └── useRealtime.ts
+│   │   │
+│   │   ├── lib/                 # Utilities
+│   │   │   ├── supabase.ts      # Cliente Supabase
+│   │   │   ├── api.ts           # Axios instance
+│   │   │   └── utils.ts
+│   │   │
+│   │   ├── types/               # TypeScript types
+│   │   │   ├── invoice.ts
+│   │   │   ├── receipt.ts
+│   │   │   └── user.ts
+│   │   │
+│   │   └── styles/
+│   │       └── globals.css
+│   │
+│   ├── capacitor.config.ts      # Config para iOS/Android
+│   ├── vite.config.ts
+│   ├── tailwind.config.js
+│   ├── tsconfig.json
+│   ├── package.json
+│   └── README.md
+│
+├── database/                    # SQL Scripts
+│   ├── schema.sql               # Schema completo
+│   ├── rls_policies.sql         # Políticas de segurança
+│   ├── indexes.sql              # Índices
+│   └── seed.sql                 # Dados de teste
+│
+├── docs/                        # Documentação
+│   ├── API.md                   # Documentação da API
+│   ├── DEPLOYMENT.md            # Guia de deploy
+│   └── USER_GUIDE.md            # Manual do usuário
+│
+├── .github/
+│   └── workflows/
+│       ├── backend-tests.yml
+│       └── frontend-build.yml
+│
+├── docker-compose.yml           # Para desenvolvimento local
+├── .gitignore
+└── README.md
+```
+
+### 6.2 Configuração Inicial (Claude Code)
+
+**Prompt para o Claude Code:**
+```
+Crie a estrutura completa do projeto Hub de Conformidade com:
+
+1. Backend Python (FastAPI):
+   - Estrutura de pastas conforme PRD
+   - main.py com CORS e rotas básicas
+   - Integração com Supabase (cliente configurado)
+   - Endpoint /api/health para verificação
+   - Requirements.txt com todas as dependências
+
+2. Frontend React (Vite):
+   - Projeto Vite + React + TypeScript
+   - Tailwind CSS configurado
+   - Shadcn/ui instalado
+   - Cliente Supabase configurado
+   - Página de login básica
+   - Dashboard vazio com sidebar
+
+3. Database:
+   - schema.sql completo (todas as tabelas do PRD)
+   - rls_policies.sql com políticas de segurança
+   - indexes.sql com índices de performance
+
+4. Configuração:
+   - .env.example com variáveis necessárias
+   - README.md com instruções de setup
+   - Docker Compose para rodar localmente
+
+Priorize funcionalidade sobre estética. Preciso de código funcional e testável.
+
+7. Integrações Externas
+7.1 Gemini API (OCR)
+Configuração:
+python# app/core/ocr_service.py
+import google.generativeai as genai
+from PIL import Image
+import io
+
+genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
+
+async def extract_receipt_data(image_bytes: bytes) -> dict:
+    """Extrai dados de cupom fiscal usando Gemini Vision"""
+    
+    # Carregar imagem
+    image = Image.open(io.BytesIO(image_bytes))
+    
+    # Prompt estruturado
+    prompt = """
+    Você é um especialista em leitura de cupons fiscais brasileiros.
+    
+    Analise esta imagem de cupom fiscal e extraia as informações em formato JSON:
+    
+    {
+      "establishment_name": "Nome do estabelecimento",
+      "establishment_cnpj": "CNPJ (se visível, formato XX.XXX.XXX/XXXX-XX)",
+      "receipt_date": "Data no formato YYYY-MM-DD",
+      "total_amount": 0.00,
+      "items": [
+        {
+          "description": "Nome do produto/serviço",
+          "quantity": 1,
+          "unit_price": 0.00,
+          "total": 0.00
+        }
+      ],
+      "payment_method": "Forma de pagamento",
+      "confidence": 0.95
+    }
+    
+    REGRAS:
+    - Se algum campo não estiver legível, use null
+    - Valores monetários em formato decimal (use ponto, não vírgula)
+    - Data sempre YYYY-MM-DD
+    - Confidence entre 0 e 1 (sua confiança geral na extração)
+    - Priorize precisão sobre completude
+    """
+    
+    # Configurar modelo
+    model = genai.GenerativeModel('gemini-2.0-flash-exp')
+    
+    # Gerar resposta
+    response = model.generate_content([prompt, image])
+    
+    # Parse JSON da resposta
+    import json
+    import re
+    
+    # Extrair JSON da resposta (remove markdown se houver)
+    json_text = response.text
+    json_match = re.search(r'\{.*\}', json_text, re.DOTALL)
+    
+    if json_match:
+        data = json.loads(json_match.group())
+        return data
+    else:
+        raise ValueError("Gemini não retornou JSON válido")
+7.2 Supabase (Auth + Storage)
+Cliente Supabase:
+python# app/db/supabase_client.py
+from supabase import create_client, Client
+import os
+
+supabase_url = os.getenv("SUPABASE_URL")
+supabase_key = os.getenv("SUPABASE_ANON_KEY")
+
+supabase: Client = create_client(supabase_url, supabase_key)
+
+# Funções de autenticação
+async def sign_up(email: str, password: str):
+    return supabase.auth.sign_up({
+        "email": email,
+        "password": password
+    })
+
+async def sign_in(email: str, password: str):
+    return supabase.auth.sign_in_with_password({
+        "email": email,
+        "password": password
+    })
+
+async def get_user(jwt: str):
+    return supabase.auth.get_user(jwt)
+
+# Funções de storage
+async def upload_file(bucket: str, path: str, file_bytes: bytes):
+    return supabase.storage.from_(bucket).upload(path, file_bytes)
+
+async def get_public_url(bucket: str, path: str) -> str:
+    return supabase.storage.from_(bucket).get_public_url(path)
+7.3 n8n (Automação)
+Workflows Sugeridos:
+
+Busca Automática de Certidões:
+
+Trigger: Cron (diário)
+Acessa sites do governo
+Faz download das certidões
+Upload no Supabase Storage
+Notifica via webhook se alguma estiver vencendo
+
+
+Alerta de Contas a Vencer:
+
+Trigger: Cron (7h da manhã)
+Query no Supabase (vencimentos em 3 dias)
+Envia email/WhatsApp para gestor
+
+
+Backup Semanal:
+
+Trigger: Cron (domingo 2h)
+Export completo do banco
+Upload no Google Drive
+
+
+
+
+8. Requisitos Não-Funcionais
+8.1 Performance
+
+Parse de XML: < 2 segundos para NF-e padrão
+OCR: < 5 segundos por imagem
+Dashboard: Carregamento inicial < 1 segundo
+Realtime: Atualizações via WebSocket em < 500ms
+
+8.2 Segurança
+
+Autenticação: JWT via Supabase
+RLS: Row Level Security ativo em todas as tabelas
+HTTPS: Obrigatório em produção
+Rate Limiting: 100 requisições/minuto por usuário
+Sanitização: Validação de inputs (XML, uploads)
+
+8.3 Resiliência
+
+Modo Offline: App mobile armazena localmente via Capacitor Storage
+Retry Automático: Fila de sincronização para uploads falhados
+Logs de Erro: Integração com Sentry
+Backup: Backup diário automatizado via n8n
+
+8.4 Escalabilidade
+
+Multi-tenancy: Suporte para 1000+ empresas
+Storage: Supabase Storage (ilimitado)
+Database: PostgreSQL (escalável verticalmente)
+API: FastAPI + Uvicorn (suporta concorrência)
+
+
+9. Plano de Desenvolvimento (Fases)
+FASE 1: MVP (4 semanas) - PRIORIDADE MÁXIMA
+Semana 1:
+
+✅ Setup da infraestrutura (Supabase, Backend, Frontend)
+✅ Schema do banco completo
+✅ Autenticação funcionando (login/registro)
+✅ Dashboard básico com cards vazios
+
+Semana 2:
+
+✅ Módulo B: Upload e parse de XML (NF-e)
+✅ Geração automática de contas a pagar
+✅ Listagem de invoices e payables
+
+Semana 3:
+
+✅ Módulo A: OCR de cupons (Gemini)
+✅ Tela de validação de cupons
+✅ App mobile básico (Capacitor)
+
+Semana 4:
+
+✅ Cálculo de índices (LC, LG, GE)
+✅ Dashboard com status de licitação
+✅ Exportação CSV e Excel
+✅ Deploy em produção
+
+FASE 2: Refinamento (2-3 semanas)
+
+✅ Módulo C: Medições e matching de NF
+✅ Exportação SPED Contábil (ECD)
+✅ Exportação SPED Fiscal
+✅ Dashboard do contador
+✅ Notificações (email/push)
+
+FASE 3: Escala (1-2 semanas)
+
+✅ Integração n8n (certidões automáticas)
+✅ Relatórios avançados (DRE, Balanço)
+✅ API pública para integrações
+✅ Modo multi-idioma (PT, EN, ES)
+
+
+10. Critérios de Sucesso (KPIs)
+Cliente (Empresa de Engenharia):
+
+✅ Redução de 80% no tempo de preparação de documentos para licitação
+✅ 100% das NF-e processadas automaticamente (sem digitação manual)
+✅ 90% de acurácia no OCR de cupons
+
+Contador:
+
+✅ Recebe dados organizados e categorizados
+✅ Gera SPED com 1 clique
+✅ Redução de 50% no tempo de fechamento mensal
+
+Produto (SaaS):
+
+✅ Sistema estável em produção (uptime > 99%)
+✅ 10 empresas usando na versão Beta
+✅ Feedback positivo (NPS > 8)
+
+
+11. Riscos e Mitigações
+RiscoImpactoProbabilidadeMitigaçãoGemini API indisponívelAltoMédiaFallback: permitir entrada manual + retry automáticoXML mal formadoMédioAltaValidação + parser robusto + tratamento de errosDados incorretos no OCRAltoMédiaTela de validação obrigatória antes de salvarRLS mal configuradoCríticoBaixaTestes automatizados + auditoria de queriesContador não adota o sistemaAltoMédiaTreinamento + interface dedicada + suporte prioritário
+
+12. Próximos Passos (Acionável)
+Agora (Próximas 24h):
+
+✅ Criar projeto no Supabase
+
+Criar database
+Rodar schema.sql completo
+Configurar RLS policies
+Criar buckets de storage: invoices, receipts, documents
+
+
+✅ Setup do Backend (FastAPI)
+
+bash   cd backend
+   python -m venv venv
+   source venv/bin/activate  # Windows: venv\Scripts\activate
+   pip install -r requirements.txt
+   cp .env.example .env  # Preencher com credenciais
+   uvicorn app.main:app --reload
+
+✅ Setup do Frontend (React)
+
+bash   cd frontend
+   npm install
+   cp .env.example .env  # Preencher com credenciais
+   npm run dev
+Esta Semana:
+
+✅ Implementar parser de XML
+
+Testar com 5-10 XMLs reais
+Validar extração de todos os campos
+
+
+✅ Criar endpoint de upload de NF-e
+
+Receber XML
+Salvar no storage
+Processar e salvar no banco
+
+
+✅ Dashboard básico
+
+Listagem de invoices
+Listagem de payables
+Cards de índices (mock inicial)
+
+
+
+Próxima Semana:
+
+✅ OCR com Gemini
+
+Integrar API
+Testar com 20 cupons reais
+Medir taxa de acerto
+
+
+✅ App Mobile (Capacitor)
+
+Configurar Capacitor
+Implementar câmera nativa
+Testar upload de fotos
+
+
+
+
+13. Glossário Técnico
+TermoSignificadoLC (Liquidez Corrente)Ativo Circulante / Passivo CirculanteLG (Liquidez Geral)(AC + ANC) / (PC + PNC)GE (Grau de Endividamento)(PC + PNC) / Patrimônio LíquidoNF-eNota Fiscal EletrônicaSPEDSistema Público de Escrituração DigitalECDEscrituração Contábil DigitalRLSRow Level Security (Segurança em nível de linha)OCROptical Character RecognitionProvisãoLançamento de despesa prevista (sem nota fiscal ainda)MediçãoRegistro de serviço/material utilizado (obras)
+
+14. Contatos e Suporte
+Suporte Técnico:
+
+Email: suporte@hubconformidade.com.br
+WhatsApp: (XX) XXXXX-XXXX
+
+Documentação:
+
+API: https://api.hubconformidade.com.br/docs
+Usuário: https://docs.hubconformidade.com.br
+
+Status do Sistema:
+
+https://status.hubconformidade.com.br
+
+
+Versão do PRD: 2.0
+Data: 14/01/2025
+Autor: Equipe Hub de Conformidade
+Status: ✅ APROVADO - EM DESENVOLVIMENTO URGENTE

@@ -1,0 +1,114 @@
+.metric-card {
+    background: var(--bg-card);
+    border-radius: var(--radius-xl);
+    padding: 20px;
+    box-shadow: var(--shadow-card);
+    border: 1px solid var(--border-light);
+    transition: all 0.3s ease;
+    position: relative;
+}
+
+.metric-card:hover {
+    box-shadow: 0 12px 24px -4px rgb(0 0 0 / 0.12);
+    transform: translateY(-2px);
+}
+
+.metric-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 8px;
+}
+
+.metric-label {
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--text-secondary);
+}
+
+.metric-icon {
+    width: 40px;
+    height: 40px;
+    border-radius: var(--radius-lg);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.metric-icon--blue {
+    background: linear-gradient(135deg, #4361EE 0%, #5A7AFF 100%);
+}
+
+.metric-icon--yellow {
+    background: linear-gradient(135deg, #FBBF24 0%, #FCD34D 100%);
+}
+
+.metric-icon--purple {
+    background: linear-gradient(135deg, #8B5CF6 0%, #A78BFA 100%);
+}
+
+.metric-icon--green {
+    background: linear-gradient(135deg, #10B981 0%, #34D399 100%);
+}
+
+.metric-value {
+    font-size: 28px;
+    font-weight: 700;
+    color: var(--text-primary);
+    line-height: 1.2;
+    margin-bottom: 12px;
+}
+
+.metric-footer {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.metric-change {
+    font-size: 13px;
+    font-weight: 500;
+}
+
+.metric-change--positive {
+    color: var(--success-green);
+}
+
+.metric-change--negative {
+    color: var(--error-red);
+}
+
+.metric-progress {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.metric-progress-fill {
+    height: 6px;
+    width: 60px;
+    background: var(--bg-main);
+    border-radius: var(--radius-full);
+    position: relative;
+    overflow: hidden;
+}
+
+.metric-progress-fill::after {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 0;
+    height: 100%;
+    width: inherit;
+    background: var(--primary-blue);
+    border-radius: var(--radius-full);
+}
+
+.metric-percentage {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-primary);
+    background: var(--bg-main);
+    padding: 2px 8px;
+    border-radius: var(--radius-sm);
+}

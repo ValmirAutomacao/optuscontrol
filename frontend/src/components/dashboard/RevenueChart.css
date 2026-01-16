@@ -1,0 +1,52 @@
+.revenue-chart {
+    height: 100%;
+}
+
+.chart-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 24px;
+}
+
+.chart-title {
+    font-size: 18px;
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.chart-legend {
+    display: flex;
+    gap: 20px;
+}
+
+.legend-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 13px;
+    color: var(--text-secondary);
+}
+
+.legend-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+}
+
+.legend-dot--blue {
+    background: var(--primary-blue);
+}
+
+.legend-dot--yellow {
+    background: var(--secondary-yellow);
+}
+
+.legend-dot--outline {
+    background: transparent;
+    border: 2px solid var(--text-muted);
+}
+
+.chart-container {
+    height: 300px;
+}
