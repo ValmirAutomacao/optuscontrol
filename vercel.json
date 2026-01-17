@@ -1,29 +1,23 @@
 {
-    "version": 2,
-    "builds": [
+    "rewrites": [
         {
-            "src": "api/index.py",
-            "use": "@vercel/python"
+            "source": "/api/v1/(.*)",
+            "destination": "/api/index.py"
         },
         {
-            "src": "frontend/dist/**",
-            "use": "@vercel/static"
+            "source": "/api/(.*)",
+            "destination": "/api/index.py"
         }
     ],
-    "routes": [
+    "headers": [
         {
-            "src": "/api/(.*)",
-            "dest": "/api/index.py"
-        },
-        {
-            "src": "/(.*)",
-            "dest": "/frontend/dist/$1"
+            "source": "/api/(.*)",
+            "headers": [
+                {
+                    "key": "Access-Control-Allow-Origin",
+                    "value": "*"
+                }
+            ]
         }
-    ],
-    "functions": {
-        "api/index.py": {
-            "memory": 1024,
-            "maxDuration": 30
-        }
-    }
+    ]
 }
