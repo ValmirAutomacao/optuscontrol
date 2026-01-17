@@ -10,50 +10,46 @@ from ..db.supabase_client import supabase
 _permissions_cache: dict = {}
 
 
-async def get_current_user(authorization: Optional[str] = Header(None)) -> dict:
-    """
-    Extrai e valida o usuário do token JWT.
-    Retorna dados do usuário incluindo company_id e role.
-    """
-    if not authorization or not authorization.startswith("Bearer "):
-        raise HTTPException(status_code=401, detail="Token de autorização não fornecido")
-    
-    token = authorization.replace("Bearer ", "")
-    
-    try:
-        # Validar token com Supabase
-        user_response = supabase.auth.get_user(token)
-        if not user_response or not user_response.user:
-            raise HTTPException(status_code=401, detail="Token inválido ou expirado")
-        
         user = user_response.user
         user_id = user.id
         email = user.email
         
-        # Buscar roles do usuário com join em companies
-        roles_result = supabase.table("user_roles").select(
-            "company_id, role, is_active, companies(name, fantasy_name)"
-        ).eq("user_id", user_id).eq("is_active", True).execute()
+        # Extrair nome dos metadados do usuário
+        user_metadata = getattr(user, "user_metadata", {}) or {}
+        full_name = user_metadata.get("full_name") or user_metadata.get("name") or "Usuário"
         
+        # Buscar roles do usuário com join em companies
         companies = []
         primary_company = None
         primary_role = None
         
-        for role_data in (roles_result.data or []):
-            comp_info = role_data.get("companies", {})
-            companies.append({
-                "company_id": role_data["company_id"],
-                "role": role_data["role"],
-                "name": comp_info.get("name"),
-                "fantasy_name": comp_info.get("fantasy_name")
-            })
-            if primary_company is None:
-                primary_company = role_data["company_id"]
-                primary_role = role_data["role"]
+        try:
+            roles_result = supabase.table("user_roles").select(
+                "company_id, role, is_active, companies(name, fantasy_name)"
+            ).eq("user_id", user_id).eq("is_active", True).execute()
+            
+            for role_data in (roles_result.data or []):
+                # PROTEÇÃO: comp_info pode vir None se o join falhar
+                unprocessed_comp = role_data.get("companies")
+                comp_info = unprocessed_comp if isinstance(unprocessed_comp, dict) else {}
+                
+                companies.append({
+                    "company_id": role_data["company_id"],
+                    "role": role_data["role"],
+                    "name": comp_info.get("name") if comp_info else None,
+                    "fantasy_name": comp_info.get("fantasy_name") if comp_info else None
+                })
+                
+                if primary_company is None:
+                    primary_company = role_data["company_id"]
+                    primary_role = role_data["role"]
+        except Exception as query_err:
+            print(f"Erro ao buscar roles/empresas: {str(query_err)}")
         
         return {
             "user_id": user_id,
             "email": email,
+            "name": full_name,
             "company_id": primary_company,
             "role": primary_role,
             "companies": companies,
