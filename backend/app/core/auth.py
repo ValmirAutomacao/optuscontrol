@@ -85,17 +85,33 @@ async def get_user_permissions(user_id: str, company_id: str) -> dict:
         return {"role": None, "permissions": {}}
     
     role = role_result.data["role"]
-    custom_modules = role_result.data.get("modules", [])
+    custom_modules = role_result.data.get("modules") or []  # Tratar None como []
     
-    # Buscar permissões do role
+    # FALLBACK: Owners e Admins SEMPRE têm acesso total, independente de role_permissions
+    if role in ["owner", "admin"]:
+        full_permissions = {
+            "dashboard": {"create": True, "read": True, "update": True, "delete": True, "export": True},
+            "companies": {"create": True, "read": True, "update": True, "delete": True, "export": True},
+            "users": {"create": True, "read": True, "update": True, "delete": True, "export": True},
+            "invoices": {"create": True, "read": True, "update": True, "delete": True, "export": True},
+            "receipts": {"create": True, "read": True, "update": True, "delete": True, "export": True},
+            "payables": {"create": True, "read": True, "update": True, "delete": True, "export": True},
+            "projects": {"create": True, "read": True, "update": True, "delete": True, "export": True},
+            "export": {"create": True, "read": True, "update": True, "delete": True, "export": True},
+        }
+        result = {"role": role, "permissions": full_permissions}
+        _permissions_cache[cache_key] = result
+        return result
+    
+    # Para outros roles, buscar permissões da tabela role_permissions
     perms_result = supabase.table("role_permissions").select("*").eq("role", role).execute()
     
     permissions = {}
     for perm in (perms_result.data or []):
         module_name = perm["module"]
         
-        # Se houver custom_modules definido, filtrar por eles
-        if custom_modules and module_name not in custom_modules:
+        # Se houver custom_modules definido E não estiver vazio, filtrar por eles
+        if custom_modules and len(custom_modules) > 0 and module_name not in custom_modules:
             continue
             
         permissions[module_name] = {
