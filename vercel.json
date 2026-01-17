@@ -3,6 +3,13 @@
         {
             "src": "api/main.py",
             "use": "@vercel/python"
+        },
+        {
+            "src": "frontend/package.json",
+            "use": "@vercel/static-build",
+            "config": {
+                "distDir": "dist"
+            }
         }
     ],
     "routes": [
@@ -15,8 +22,11 @@
             "dest": "/api/main.py"
         },
         {
+            "handle": "filesystem"
+        },
+        {
             "src": "/(.*)",
-            "dest": "/index.html"
+            "dest": "/frontend/$1"
         }
     ]
 }
