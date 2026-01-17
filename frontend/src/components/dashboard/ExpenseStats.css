@@ -141,3 +141,29 @@
     font-weight: 700;
     color: var(--text-primary);
 }
+
+/* Loading and Empty States */
+.stats-loading,
+.stats-empty {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 200px;
+    color: var(--text-muted);
+    text-align: center;
+    gap: 12px;
+}
+
+.stats-empty small {
+    font-size: 12px;
+    color: var(--text-muted);
+}
+
+.transactions-title {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text-secondary);
+    margin-bottom: 8px;
+    padding-left: 12px;
+}

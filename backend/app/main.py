@@ -26,6 +26,7 @@ app.add_middleware(
         "https://optusagentiasaas.shop",
         "https://www.optusagentiasaas.shop",
         "https://api.optusagentiasaas.shop",
+        "https://optuscontrol.vercel.app",
         "https://*.vercel.app",
         "https://*.supabase.co"
     ],

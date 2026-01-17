@@ -1,90 +1,165 @@
+import { useEffect, useState } from 'react'
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell, LabelList } from 'recharts'
+import { useAuth } from '../../hooks/useAuth'
 import './RevenueChart.css'
 
-const data = [
-    { year: '2020', target: 100000, achieved: 50000, percentTarget: 50, percentAchieved: 50 },
-    { year: '2021', target: 120000, achieved: 48000, percentTarget: 40, percentAchieved: 40 },
-    { year: '2022', target: 150000, achieved: 82500, percentTarget: 55, percentAchieved: 55 },
-    { year: '2023', target: 100000, achieved: 100000, percentTarget: 70, percentAchieved: 100, highlight: true },
-    { year: '2024', target: 180000, achieved: 126000, percentTarget: 70, percentAchieved: 70 },
-    { year: '2025', target: 200000, achieved: 130000, percentTarget: 66, percentAchieved: 65 },
-]
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1'
 
-export function RevenueChart() {
+interface RevenueData {
+    month: string
+    receitas: number
+    despesas: number
+}
+
+interface Props {
+    companyId?: string | null
+}
+
+export function RevenueChart({ companyId }: Props) {
+    const { session } = useAuth()
+    const [data, setData] = useState<RevenueData[]>([])
+    const [loading, setLoading] = useState(true)
+
+    useEffect(() => {
+        if (companyId && session?.access_token) {
+            loadData()
+        } else {
+            // Dados zerados para quando não há empresa selecionada
+            setData(getEmptyData())
+            setLoading(false)
+        }
+    }, [companyId, session])
+
+    function getEmptyData(): RevenueData[] {
+        const months = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun']
+        return months.map(month => ({
+            month,
+            receitas: 0,
+            despesas: 0
+        }))
+    }
+
+    async function loadData() {
+        try {
+            // Buscar invoices para receitas
+            const invoicesRes = await fetch(`${API_URL}/invoices?company_id=${companyId}`, {
+                headers: { 'Authorization': `Bearer ${session?.access_token}` }
+            })
+
+            // Buscar payables para despesas
+            const payablesRes = await fetch(`${API_URL}/payables?company_id=${companyId}`, {
+                headers: { 'Authorization': `Bearer ${session?.access_token}` }
+            })
+
+            const monthlyData: { [key: string]: RevenueData } = {}
+            const months = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez']
+
+            // Inicializar últimos 6 meses
+            const currentMonth = new Date().getMonth()
+            for (let i = 5; i >= 0; i--) {
+                const monthIndex = (currentMonth - i + 12) % 12
+                const monthName = months[monthIndex]
+                monthlyData[monthName] = { month: monthName, receitas: 0, despesas: 0 }
+            }
+
+            if (invoicesRes.ok) {
+                const invoices = await invoicesRes.json()
+                invoices.forEach((inv: any) => {
+                    if (inv.issue_date) {
+                        const date = new Date(inv.issue_date)
+                        const monthName = months[date.getMonth()]
+                        if (monthlyData[monthName]) {
+                            monthlyData[monthName].receitas += inv.total_value || 0
+                        }
+                    }
+                })
+            }
+
+            if (payablesRes.ok) {
+                const payables = await payablesRes.json()
+                payables.forEach((p: any) => {
+                    if (p.due_date) {
+                        const date = new Date(p.due_date)
+                        const monthName = months[date.getMonth()]
+                        if (monthlyData[monthName]) {
+                            monthlyData[monthName].despesas += p.amount || 0
+                        }
+                    }
+                })
+            }
+
+            setData(Object.values(monthlyData))
+        } catch (error) {
+            console.error('Erro ao carregar dados do gráfico:', error)
+            setData(getEmptyData())
+        } finally {
+            setLoading(false)
+        }
+    }
+
+    const hasData = data.some(d => d.receitas > 0 || d.despesas > 0)
+
     return (
         <div className="revenue-chart">
             <div className="chart-header">
-                <h3 className="chart-title">Revenue Evaluation</h3>
+                <h3 className="chart-title">Evolução Financeira</h3>
                 <div className="chart-legend">
                     <span className="legend-item">
                         <span className="legend-dot legend-dot--blue"></span>
-                        Target
+                        Receitas
                     </span>
                     <span className="legend-item">
                         <span className="legend-dot legend-dot--yellow"></span>
-                        Achieved
-                    </span>
-                    <span className="legend-item">
-                        <span className="legend-dot legend-dot--outline"></span>
-                        Yearly
+                        Despesas
                     </span>
                 </div>
             </div>
 
             <div className="chart-container">
-                <ResponsiveContainer width="100%" height={300}>
-                    <BarChart data={data} barGap={8}>
-                        <XAxis
-                            dataKey="year"
-                            axisLine={false}
-                            tickLine={false}
-                            tick={{ fill: '#6B7280', fontSize: 12 }}
-                        />
-                        <YAxis
-                            axisLine={false}
-                            tickLine={false}
-                            tick={{ fill: '#6B7280', fontSize: 12 }}
-                            tickFormatter={(value) => `$${value / 1000}k`}
-                        />
-                        <Tooltip
-                            contentStyle={{
-                                background: '#1A1D21',
-                                border: 'none',
-                                borderRadius: '8px',
-                                color: 'white'
-                            }}
-                        />
-                        <Bar dataKey="target" radius={[8, 8, 0, 0]} maxBarSize={40}>
-                            {data.map((_entry, index) => (
-                                <Cell key={`target-${index}`} fill="#4361EE" />
-                            ))}
-                            <LabelList
-                                dataKey="percentTarget"
-                                position="center"
-                                fill="white"
-                                fontSize={11}
-                                fontWeight={600}
-                                formatter={(value: any) => `${value}%`}
+                {loading ? (
+                    <div className="chart-loading">Carregando...</div>
+                ) : !hasData ? (
+                    <div className="chart-empty">
+                        <p>Nenhum dado financeiro registrado.</p>
+                        <small>Os dados aparecerão aqui quando você processar notas fiscais.</small>
+                    </div>
+                ) : (
+                    <ResponsiveContainer width="100%" height={300}>
+                        <BarChart data={data} barGap={8}>
+                            <XAxis
+                                dataKey="month"
+                                axisLine={false}
+                                tickLine={false}
+                                tick={{ fill: '#6B7280', fontSize: 12 }}
                             />
-                        </Bar>
-                        <Bar dataKey="achieved" radius={[8, 8, 0, 0]} maxBarSize={40}>
-                            {data.map((entry, index) => (
-                                <Cell
-                                    key={`achieved-${index}`}
-                                    fill={entry.highlight ? '#FBBF24' : '#4361EE'}
-                                />
-                            ))}
-                            <LabelList
-                                dataKey="percentAchieved"
-                                position="center"
-                                fill="white"
-                                fontSize={11}
-                                fontWeight={600}
-                                formatter={(value: any) => `${value}%`}
+                            <YAxis
+                                axisLine={false}
+                                tickLine={false}
+                                tick={{ fill: '#6B7280', fontSize: 12 }}
+                                tickFormatter={(value) => `R$${(value / 1000).toFixed(0)}k`}
                             />
-                        </Bar>
-                    </BarChart>
-                </ResponsiveContainer>
+                            <Tooltip
+                                contentStyle={{
+                                    background: '#1A1D21',
+                                    border: 'none',
+                                    borderRadius: '8px',
+                                    color: 'white'
+                                }}
+                                formatter={(value: number) => [`R$ ${value.toLocaleString('pt-BR')}`, '']}
+                            />
+                            <Bar dataKey="receitas" name="Receitas" radius={[8, 8, 0, 0]} maxBarSize={40}>
+                                {data.map((_entry, index) => (
+                                    <Cell key={`receitas-${index}`} fill="#4361EE" />
+                                ))}
+                            </Bar>
+                            <Bar dataKey="despesas" name="Despesas" radius={[8, 8, 0, 0]} maxBarSize={40}>
+                                {data.map((_entry, index) => (
+                                    <Cell key={`despesas-${index}`} fill="#FBBF24" />
+                                ))}
+                            </Bar>
+                        </BarChart>
+                    </ResponsiveContainer>
+                )}
             </div>
         </div>
     )
