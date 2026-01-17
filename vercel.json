@@ -2,15 +2,15 @@
     "rewrites": [
         {
             "source": "/api/v1/(.*)",
-            "destination": "/api/index.py"
+            "destination": "/api/index"
         },
         {
             "source": "/api/(.*)",
-            "destination": "/api/index.py"
+            "destination": "/api/index"
         },
         {
             "source": "/((?!api/).*)",
-            "destination": "/$1"
+            "destination": "/index.html"
         }
     ]
 }
