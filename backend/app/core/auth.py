@@ -1,6 +1,7 @@
 """
 Middleware e Dependencies de Autorização
 Sistema de permissões baseado em roles e company_id
+v1.0.1 - Fixed get_current_user function
 """
 from fastapi import Depends, HTTPException, Header
 from typing import Optional, List
