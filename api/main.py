@@ -124,3 +124,7 @@ except Exception as e:
         }, status_code=500)
 
     handler = app
+
+# Garantir que 'app' é a aplicação ASGI para Vercel
+# A Vercel espera encontrar 'app' como ASGI application
+app = handler

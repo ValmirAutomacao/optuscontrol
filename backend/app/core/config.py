@@ -1,12 +1,15 @@
 import os
 from dotenv import load_dotenv
 
-load_dotenv()
+# Só carregar .env se não estiver em produção (Vercel define VERCEL=1)
+# Isso evita que .env.example sobrescreva variáveis de ambiente reais
+if not os.getenv("VERCEL"):
+    load_dotenv()
 
 class Settings:
-    # Supabase
-    SUPABASE_URL: str = os.getenv("SUPABASE_URL", "")
-    SUPABASE_SERVICE_KEY: str = os.getenv("SUPABASE_SERVICE_KEY", "")
+    # Supabase - usar os.environ para garantir que pega da env var real
+    SUPABASE_URL: str = os.environ.get("SUPABASE_URL", "")
+    SUPABASE_SERVICE_KEY: str = os.environ.get("SUPABASE_SERVICE_KEY", "")
     
     # OCR Providers (múltiplos para fallback)
     OPENROUTER_API_KEY: str = os.getenv("OPENROUTER_API_KEY", "")
