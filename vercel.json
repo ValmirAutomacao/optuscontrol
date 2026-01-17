@@ -1,4 +1,11 @@
 {
+    "version": 2,
+    "builds": [
+        {
+            "src": "api/index.py",
+            "use": "@vercel/python"
+        }
+    ],
     "rewrites": [
         {
             "source": "/api/v1/(.*)",
@@ -7,17 +14,10 @@
         {
             "source": "/api/(.*)",
             "destination": "/api/index.py"
-        }
-    ],
-    "headers": [
+        },
         {
-            "source": "/api/(.*)",
-            "headers": [
-                {
-                    "key": "Access-Control-Allow-Origin",
-                    "value": "*"
-                }
-            ]
+            "source": "/((?!api/).*)",
+            "destination": "/index.html"
         }
     ]
 }
