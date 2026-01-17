@@ -24,6 +24,7 @@ app.add_middleware(
         "http://localhost:5174",
         "http://localhost:3000",
         "https://optusagentiasaas.shop",
+        "https://www.optusagentiasaas.shop",
         "https://*.vercel.app",
         "https://*.supabase.co"
     ],

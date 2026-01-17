@@ -1,36 +1,36 @@
 import sys
 import os
+import logging
 
-# Adicionar o diretório backend ao path para que os imports funcionem corretamente na Vercel
+# Configuração de logging básica
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+# Adicionar o diretório backend ao path
+# Vercel executa as funções no diretório raiz do projeto
 backend_path = os.path.join(os.path.dirname(__file__), '..', 'backend')
-sys.path.insert(0, backend_path)
+if backend_path not in sys.path:
+    sys.path.insert(0, backend_path)
 
-# Tentar importar a aplicação FastAPI com tratamento de erro
+logger.info(f"Backend path added: {backend_path}")
+logger.info(f"Current sys.path: {sys.path}")
+
 try:
     from app.main import app
     handler = app
+    logger.info("Application loaded successfully")
 except Exception as e:
-    # Se falhar, criar uma app minimalista para diagnóstico
+    logger.error(f"Failed to load application: {e}", exc_info=True)
     from fastapi import FastAPI
-    from fastapi.responses import JSONResponse
-    
     app = FastAPI()
     
     @app.get("/api/v1/health")
     def health():
-        return {"status": "error", "message": f"Failed to load main app: {str(e)}"}
-    
+        return {"status": "error", "error": str(e)}
+        
     @app.get("/{path:path}")
     def catch_all(path: str):
-        return JSONResponse(
-            status_code=500,
-            content={
-                "error": "Application failed to initialize",
-                "details": str(e),
-                "backend_path": backend_path,
-                "sys_path": sys.path[:5]
-            }
-        )
+        return {"error": "Initialization failure", "details": str(e)}
     
     handler = app
 
