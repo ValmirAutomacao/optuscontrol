@@ -109,14 +109,9 @@ export function UploadReceiptModal({ isOpen, onClose, companyId, onSuccess }: Up
         if (response.error) {
             setResult({ success: false, message: response.error })
         } else if (response.data) {
-            const ocr = response.data.ocr_result as Record<string, unknown> | undefined
-
             // Fechar modal imediatamente e atualizar lista
             onSuccess()
             onClose()
-
-            // Se houver erro de OCR, poderia mostrar um toast (futuramente)
-            // Por enquanto, o registro foi criado mesmo com erro de OCR
         }
     }
 
