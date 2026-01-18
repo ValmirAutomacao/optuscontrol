@@ -217,6 +217,7 @@ export function Expenses() {
                                 <th>Nº Doc</th>
                                 <th>Data</th>
                                 <th>Pagamento</th>
+                                <th>Categoria</th>
                                 <th>Valor</th>
                                 <th>Status</th>
                                 <th>Ações</th>
@@ -230,6 +231,7 @@ export function Expenses() {
                                     <td className="text-muted">{expense.document_number || '-'}</td>
                                     <td>{expense.receipt_date ? new Date(expense.receipt_date).toLocaleDateString('pt-BR') : '-'}</td>
                                     <td>{getPaymentLabel(expense.payment_method)}</td>
+                                    <td>{getCategoryName(expense.category_id)}</td>
                                     <td className="font-medium">R$ {Number(expense.total_amount || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</td>
                                     <td>
                                         {expense.is_validated ? (

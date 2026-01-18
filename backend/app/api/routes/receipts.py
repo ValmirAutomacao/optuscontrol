@@ -354,9 +354,10 @@ async def convert_to_payable(
 @router.delete("/{receipt_id}")
 async def delete_receipt(receipt_id: str) -> dict:
     """Remove um cupom fiscal e suas contas a pagar vinculadas."""
-    # Remover payables vinculados primeiro (opcional - pode querer manter)
-    supabase.table("payables").update({"receipt_id": None}).eq("receipt_id", receipt_id).execute()
+    # Deletar payables vinculados (exclusão em cascata)
+    supabase.table("payables").delete().eq("receipt_id", receipt_id).execute()
     
     # Remover cupom
     supabase.table("receipts").delete().eq("id", receipt_id).execute()
     return {"success": True}
+

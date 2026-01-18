@@ -51,14 +51,28 @@ async def export_lancamentos_excel(
     # Buscar Despesas (saída de caixa)
     if include_expenses:
         result = supabase.table("receipts").select("*").eq("company_id", company_id).gte("receipt_date", start_date).lte("receipt_date", end_date).execute()
+        
+        # Buscar categorias para mapear ID -> Nome
+        categories_result = supabase.table("expense_categories").select("id, name").eq("company_id", company_id).execute()
+        categories_map = {c["id"]: c["name"] for c in (categories_result.data or [])}
+        
         for exp in (result.data or []):
+            # Usar categoria como discriminação (DESCRIÇÃO na planilha do contador)
+            category_name = categories_map.get(exp.get("category_id"), "")
+            discriminacao = category_name if category_name else f"Despesa - {exp.get('establishment_name', 'N/I')}"
+            
+            # Se tiver número do documento, incluir
+            doc_number = exp.get("document_number", "")
+            if doc_number:
+                discriminacao = f"{discriminacao} ({doc_number})"
+            
             lancamentos.append({
                 "data": exp.get("created_at", "")[:10],
                 "tipo": "S",  # Saída
                 "empresa": exp.get("establishment_name", ""),
-                "nf": "",  # Cupom não tem NF
+                "nf": doc_number,
                 "data_emissao": exp.get("receipt_date", ""),
-                "discriminacao": f"Despesa - {exp.get('establishment_name', 'N/I')}",
+                "discriminacao": discriminacao,
                 "valor": float(exp.get("total_amount", 0) or 0)
             })
     

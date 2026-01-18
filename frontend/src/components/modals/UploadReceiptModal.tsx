@@ -1,10 +1,16 @@
 import { useState, useRef, useEffect } from 'react'
-import { X, Camera, Image, Loader2, CheckCircle, AlertCircle } from 'lucide-react'
+import { X, Camera, Image, Loader2, CheckCircle, AlertCircle, Building2 } from 'lucide-react'
 import { uploadReceiptImage } from '../../lib/api'
 import { useOfflineSync } from '../../hooks/useOfflineSync'
 import { useAuth } from '../../hooks/useAuth'
 import { db } from '../../lib/offlineDb'
+import { supabase } from '../../lib/supabase'
 import './UploadModal.css'
+
+interface Project {
+    id: string
+    name: string
+}
 
 interface UploadReceiptModalProps {
     isOpen: boolean
@@ -22,6 +28,18 @@ export function UploadReceiptModal({ isOpen, onClose, companyId, onSuccess }: Up
     const [result, setResult] = useState<{ success: boolean; message: string; data?: Record<string, unknown> } | null>(null)
     const fileInputRef = useRef<HTMLInputElement>(null)
 
+    // Estado para projetos/obras
+    const [projects, setProjects] = useState<Project[]>([])
+    const [selectedProjectId, setSelectedProjectId] = useState<string>('')
+    const [loadingProjects, setLoadingProjects] = useState(false)
+
+    // Buscar projetos quando modal abre
+    useEffect(() => {
+        if (isOpen && companyId) {
+            fetchProjects()
+        }
+    }, [isOpen, companyId])
+
     // Limpar estado quando modal abre/fecha
     useEffect(() => {
         if (isOpen) {
@@ -30,6 +48,7 @@ export function UploadReceiptModal({ isOpen, onClose, companyId, onSuccess }: Up
             setPreview(null)
             setResult(null)
             setLoading(false)
+            setSelectedProjectId('')
             // Limpar input de arquivo
             if (fileInputRef.current) {
                 fileInputRef.current.value = ''
@@ -45,6 +64,23 @@ export function UploadReceiptModal({ isOpen, onClose, companyId, onSuccess }: Up
             }
         }
     }, [preview])
+
+    async function fetchProjects() {
+        setLoadingProjects(true)
+        try {
+            const { data } = await supabase
+                .from('projects')
+                .select('id, name')
+                .eq('company_id', companyId)
+                .eq('status', 'active')
+                .order('name')
+            setProjects(data || [])
+        } catch (error) {
+            console.error('Erro ao buscar projetos:', error)
+        } finally {
+            setLoadingProjects(false)
+        }
+    }
 
     if (!isOpen) return null
 
@@ -71,6 +107,12 @@ export function UploadReceiptModal({ isOpen, onClose, companyId, onSuccess }: Up
     const handleUpload = async () => {
         if (!file) return
 
+        // Validar projeto selecionado
+        if (!selectedProjectId) {
+            setResult({ success: false, message: 'Selecione uma obra/projeto' })
+            return
+        }
+
         if (!isOnline) {
             // Modo Offline
             setLoading(true)
@@ -84,6 +126,7 @@ export function UploadReceiptModal({ isOpen, onClose, companyId, onSuccess }: Up
 
                 await db.receipts.add({
                     company_id: companyId,
+                    project_id: selectedProjectId,
                     image_base64: base64,
                     status: 'pending_sync',
                     created_at: new Date().toISOString()
@@ -102,7 +145,7 @@ export function UploadReceiptModal({ isOpen, onClose, companyId, onSuccess }: Up
         setLoading(true)
         setResult(null)
 
-        const response = await uploadReceiptImage(file, companyId, session?.access_token)
+        const response = await uploadReceiptImage(file, companyId, session?.access_token, selectedProjectId)
 
         setLoading(false)
 
@@ -121,6 +164,8 @@ export function UploadReceiptModal({ isOpen, onClose, companyId, onSuccess }: Up
         }
     }
 
+    const canUpload = file && selectedProjectId && !loading
+
     return (
         <div className="modal-overlay" onClick={handleClose}>
             <div className="modal-content" onClick={(e) => e.stopPropagation()}>
@@ -129,6 +174,30 @@ export function UploadReceiptModal({ isOpen, onClose, companyId, onSuccess }: Up
                     <button className="modal-close" onClick={handleClose} disabled={loading}>
                         <X size={20} />
                     </button>
+                </div>
+
+                {/* Seletor de Projeto/Obra - OBRIGATÓRIO */}
+                <div className="upload-project-select">
+                    <label>
+                        <Building2 size={16} />
+                        Obra/Projeto <span className="required">*</span>
+                    </label>
+                    <select
+                        value={selectedProjectId}
+                        onChange={(e) => setSelectedProjectId(e.target.value)}
+                        disabled={loading || loadingProjects}
+                        className={!selectedProjectId && file ? 'error' : ''}
+                    >
+                        <option value="">
+                            {loadingProjects ? 'Carregando...' : 'Selecione a obra/projeto'}
+                        </option>
+                        {projects.map(p => (
+                            <option key={p.id} value={p.id}>{p.name}</option>
+                        ))}
+                    </select>
+                    {projects.length === 0 && !loadingProjects && (
+                        <span className="help-text">Nenhum projeto ativo encontrado</span>
+                    )}
                 </div>
 
                 <div
@@ -176,7 +245,7 @@ export function UploadReceiptModal({ isOpen, onClose, companyId, onSuccess }: Up
                     <button
                         className="btn-primary"
                         onClick={handleUpload}
-                        disabled={!file || loading}
+                        disabled={!canUpload}
                     >
                         {loading ? (
                             <>
