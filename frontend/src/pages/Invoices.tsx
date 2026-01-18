@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { FileText, Upload, Search, Filter, Eye, Edit, Trash2, X } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { UploadInvoiceModal } from '../components/modals/UploadInvoiceModal'
+import { usePermissions } from '../hooks/usePermissions'
 import './Invoices.css'
 
 interface Invoice {
@@ -20,9 +21,8 @@ interface Invoice {
     }
 }
 
-const COMPANY_ID = 'a1b2c3d4-e5f6-7890-abcd-ef1234567890'
-
 export function Invoices() {
+    const { activeCompanyId } = usePermissions()
     const [invoices, setInvoices] = useState<Invoice[]>([])
     const [loading, setLoading] = useState(true)
     const [searchTerm, setSearchTerm] = useState('')
@@ -286,7 +286,7 @@ export function Invoices() {
                 </div>
             )}
 
-            <UploadInvoiceModal isOpen={showUploadModal} onClose={() => setShowUploadModal(false)} companyId={COMPANY_ID} onSuccess={fetchInvoices} />
+            <UploadInvoiceModal isOpen={showUploadModal} onClose={() => setShowUploadModal(false)} companyId={activeCompanyId || ''} onSuccess={fetchInvoices} />
         </div>
     )
 }

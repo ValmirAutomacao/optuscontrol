@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { Receipt, Camera, Search, Filter, Eye, Edit, Trash2, CheckCircle, XCircle, X } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { UploadReceiptModal } from '../components/modals/UploadReceiptModal'
+import { usePermissions } from '../hooks/usePermissions'
 import './Expenses.css'
 
 interface ExpenseItem {
@@ -27,9 +28,8 @@ interface Category {
     icon: string
 }
 
-const COMPANY_ID = 'a1b2c3d4-e5f6-7890-abcd-ef1234567890'
-
 export function Expenses() {
+    const { activeCompanyId } = usePermissions()
     const [expenses, setExpenses] = useState<ExpenseItem[]>([])
     const [categories, setCategories] = useState<Category[]>([])
     const [loading, setLoading] = useState(true)
@@ -341,7 +341,7 @@ export function Expenses() {
                 </div>
             )}
 
-            <UploadReceiptModal isOpen={showUploadModal} onClose={() => setShowUploadModal(false)} companyId={COMPANY_ID} onSuccess={fetchExpenses} />
+            <UploadReceiptModal isOpen={showUploadModal} onClose={() => setShowUploadModal(false)} companyId={activeCompanyId || ''} onSuccess={fetchExpenses} />
         </div>
     )
 }

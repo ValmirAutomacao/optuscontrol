@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { Receipt, Camera, Search, Filter, Eye, CheckCircle, XCircle } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { UploadReceiptModal } from '../components/modals/UploadReceiptModal'
+import { usePermissions } from '../hooks/usePermissions'
 import './Receipts.css'
 
 interface ReceiptItem {
@@ -20,10 +21,8 @@ interface ReceiptItem {
     }
 }
 
-// ID da empresa de desenvolvimento
-const COMPANY_ID = 'a1b2c3d4-e5f6-7890-abcd-ef1234567890'
-
 export function Receipts() {
+    const { activeCompanyId } = usePermissions()
     const [receipts, setReceipts] = useState<ReceiptItem[]>([])
     const [loading, setLoading] = useState(true)
     const [showUploadModal, setShowUploadModal] = useState(false)
@@ -283,7 +282,7 @@ export function Receipts() {
             <UploadReceiptModal
                 isOpen={showUploadModal}
                 onClose={() => setShowUploadModal(false)}
-                companyId={COMPANY_ID}
+                companyId={activeCompanyId || ''}
                 onSuccess={fetchReceipts}
             />
         </div>

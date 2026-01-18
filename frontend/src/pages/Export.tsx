@@ -1,11 +1,12 @@
 import { useState } from 'react'
 import { Download, FileSpreadsheet, FileText, Calendar } from 'lucide-react'
+import { usePermissions } from '../hooks/usePermissions'
 import './Export.css'
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1'
-const COMPANY_ID = 'a1b2c3d4-e5f6-7890-abcd-ef1234567890'
 
 export function Export() {
+    const { activeCompanyId } = usePermissions()
     const [startDate, setStartDate] = useState(() => {
         const d = new Date()
         d.setMonth(d.getMonth() - 1)
@@ -22,7 +23,7 @@ export function Export() {
         setLoading(true)
         try {
             const params = new URLSearchParams({
-                company_id: COMPANY_ID,
+                company_id: activeCompanyId || '',
                 start_date: startDate,
                 end_date: endDate,
                 include_invoices: includeInvoices.toString(),
