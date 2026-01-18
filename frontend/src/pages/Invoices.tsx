@@ -32,14 +32,18 @@ export function Invoices() {
     const [showDeleteConfirm, setShowDeleteConfirm] = useState<string | null>(null)
 
     useEffect(() => {
-        fetchInvoices()
-    }, [])
+        if (activeCompanyId) {
+            fetchInvoices()
+        }
+    }, [activeCompanyId])
 
     async function fetchInvoices() {
+        if (!activeCompanyId) return
         try {
             const { data, error } = await supabase
                 .from('invoices')
                 .select('*')
+                .eq('company_id', activeCompanyId)
                 .order('created_at', { ascending: false })
             if (error) throw error
             setInvoices(data || [])

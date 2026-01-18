@@ -30,14 +30,18 @@ export function Receipts() {
     const [selectedReceipt, setSelectedReceipt] = useState<ReceiptItem | null>(null)
 
     useEffect(() => {
-        fetchReceipts()
-    }, [])
+        if (activeCompanyId) {
+            fetchReceipts()
+        }
+    }, [activeCompanyId])
 
     async function fetchReceipts() {
+        if (!activeCompanyId) return
         try {
             const { data, error } = await supabase
                 .from('receipts')
                 .select('*')
+                .eq('company_id', activeCompanyId)
                 .order('created_at', { ascending: false })
 
             if (error) throw error

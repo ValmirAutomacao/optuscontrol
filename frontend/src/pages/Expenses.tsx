@@ -40,15 +40,19 @@ export function Expenses() {
     const [showDeleteConfirm, setShowDeleteConfirm] = useState<string | null>(null)
 
     useEffect(() => {
-        fetchExpenses()
-        fetchCategories()
-    }, [])
+        if (activeCompanyId) {
+            fetchExpenses()
+            fetchCategories()
+        }
+    }, [activeCompanyId])
 
     async function fetchExpenses() {
+        if (!activeCompanyId) return
         try {
             const { data, error } = await supabase
                 .from('receipts')
                 .select('*')
+                .eq('company_id', activeCompanyId)
                 .order('created_at', { ascending: false })
             if (error) throw error
             setExpenses(data || [])
