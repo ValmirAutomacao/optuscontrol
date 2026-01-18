@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell, LabelList } from 'recharts'
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts'
 import { useAuth } from '../../hooks/useAuth'
 import './RevenueChart.css'
 
@@ -145,7 +145,7 @@ export function RevenueChart({ companyId }: Props) {
                                     borderRadius: '8px',
                                     color: 'white'
                                 }}
-                                formatter={(value: number) => [`R$ ${value.toLocaleString('pt-BR')}`, '']}
+                                formatter={(value) => [`R$ ${(value as number).toLocaleString('pt-BR')}`, '']}
                             />
                             <Bar dataKey="receitas" name="Receitas" radius={[8, 8, 0, 0]} maxBarSize={40}>
                                 {data.map((_entry, index) => (

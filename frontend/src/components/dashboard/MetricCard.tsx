@@ -5,11 +5,13 @@ interface MetricCardProps {
     label: string
     value: string
     change: string
-    changeType: 'positive' | 'negative'
+    changeType: 'positive' | 'negative' | 'neutral'
     percentage: number
     icon: ElementType
     iconColor: 'blue' | 'yellow' | 'purple' | 'green'
 }
+
+export type { MetricCardProps }
 
 export function MetricCard({
     label,
@@ -33,7 +35,7 @@ export function MetricCard({
 
             <div className="metric-footer">
                 <span className={`metric-change metric-change--${changeType}`}>
-                    {changeType === 'positive' ? '↑' : '↓'} {change}
+                    {changeType === 'positive' ? '↑' : changeType === 'negative' ? '↓' : '•'} {change}
                 </span>
                 <div className="metric-progress">
                     <div

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { PieChart, Pie, Cell, ResponsiveContainer } from 'recharts'
-import { FileText, Receipt, CreditCard, TrendingUp } from 'lucide-react'
+import { FileText, CreditCard, TrendingUp } from 'lucide-react'
 import { useAuth } from '../../hooks/useAuth'
 import './ExpenseStats.css'
 
@@ -10,6 +10,7 @@ interface CategoryData {
     name: string
     value: number
     color: string
+    [key: string]: string | number
 }
 
 interface RecentTransaction {
