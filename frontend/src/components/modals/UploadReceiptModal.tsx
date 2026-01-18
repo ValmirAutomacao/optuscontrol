@@ -2,6 +2,7 @@ import { useState, useRef } from 'react'
 import { X, Camera, Image, Loader2, CheckCircle, AlertCircle } from 'lucide-react'
 import { uploadReceiptImage } from '../../lib/api'
 import { useOfflineSync } from '../../hooks/useOfflineSync'
+import { useAuth } from '../../hooks/useAuth'
 import { db } from '../../lib/offlineDb'
 import './UploadModal.css'
 
@@ -14,6 +15,7 @@ interface UploadReceiptModalProps {
 
 export function UploadReceiptModal({ isOpen, onClose, companyId, onSuccess }: UploadReceiptModalProps) {
     const { isOnline } = useOfflineSync()
+    const { session } = useAuth()
     const [file, setFile] = useState<File | null>(null)
     const [preview, setPreview] = useState<string | null>(null)
     const [loading, setLoading] = useState(false)
@@ -75,7 +77,7 @@ export function UploadReceiptModal({ isOpen, onClose, companyId, onSuccess }: Up
         setLoading(true)
         setResult(null)
 
-        const response = await uploadReceiptImage(file, companyId)
+        const response = await uploadReceiptImage(file, companyId, session?.access_token)
 
         if (response.error) {
             setResult({ success: false, message: response.error })

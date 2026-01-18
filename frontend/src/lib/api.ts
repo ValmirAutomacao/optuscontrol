@@ -75,12 +75,17 @@ export async function listInvoices(companyId: string) {
 
 // ========== RECEIPTS ==========
 
-export async function uploadReceiptImage(file: File, companyId: string, projectId?: string) {
+export async function uploadReceiptImage(file: File, companyId: string, token?: string, projectId?: string) {
     const formData = new FormData()
     formData.append('file', file)
 
     let url = `/receipts/upload?company_id=${companyId}`
     if (projectId) url += `&project_id=${projectId}`
+
+    const headers: HeadersInit = {}
+    if (token) {
+        headers['Authorization'] = `Bearer ${token}`
+    }
 
     return apiRequest<{
         success: boolean
@@ -91,6 +96,7 @@ export async function uploadReceiptImage(file: File, companyId: string, projectI
     }>(url, {
         method: 'POST',
         body: formData,
+        headers,
     })
 }
 
