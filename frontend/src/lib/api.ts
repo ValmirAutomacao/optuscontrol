@@ -141,6 +141,10 @@ export async function listReceipts(companyId: string) {
     return apiRequest<Record<string, unknown>[]>(`/receipts?company_id=${companyId}`)
 }
 
+export async function deleteReceipt(receiptId: string) {
+    return apiRequest<{ success: boolean }>(`/receipts/${receiptId}`, { method: 'DELETE' })
+}
+
 // ========== INDICATORS ==========
 
 export async function getLatestIndicators(companyId: string) {

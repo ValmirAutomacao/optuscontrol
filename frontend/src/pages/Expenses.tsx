@@ -102,7 +102,13 @@ export function Expenses() {
 
     async function handleDelete(id: string) {
         try {
-            await supabase.from('receipts').delete().eq('id', id)
+            // Usar API backend para delete em cascata (remove payables vinculados)
+            const { deleteReceipt } = await import('../lib/api')
+            const response = await deleteReceipt(id)
+            if (response.error) {
+                console.error('Erro ao excluir:', response.error)
+                return
+            }
             fetchExpenses()
             setShowDeleteConfirm(null)
             setSelectedExpense(null)
