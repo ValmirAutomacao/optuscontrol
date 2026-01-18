@@ -37,13 +37,7 @@ async def list_invoices(
     return result.data
 
 
-@router.get("/{invoice_id}")
-async def get_invoice(invoice_id: str) -> dict:
-    """Retorna uma nota fiscal específica."""
-    result = supabase.table("invoices").select("*").eq("id", invoice_id).single().execute()
-    return result.data
-
-
+# IMPORTANTE: Rotas específicas ANTES de rotas com parâmetros dinâmicos
 @router.post("/upload")
 async def upload_xml(
     file: UploadFile = File(...),
@@ -145,13 +139,6 @@ async def upload_xml(
         raise HTTPException(status_code=500, detail=f"Erro ao processar XML: {str(e)}")
 
 
-@router.delete("/{invoice_id}")
-async def delete_invoice(invoice_id: str) -> dict:
-    """Remove uma nota fiscal."""
-    supabase.table("invoices").delete().eq("id", invoice_id).execute()
-    return {"success": True}
-
-
 @router.post("/upload-image")
 async def upload_image(
     file: UploadFile = File(...),
@@ -246,3 +233,20 @@ async def upload_image(
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Erro ao processar imagem: {str(e)}")
 
+
+# Rotas com parâmetros dinâmicos DEPOIS das rotas específicas
+@router.get("/{invoice_id}")
+async def get_invoice(invoice_id: str) -> dict:
+    """Retorna uma nota fiscal específica."""
+    result = supabase.table("invoices").select("*").eq("id", invoice_id).single().execute()
+    return result.data
+
+
+@router.delete("/{invoice_id}")
+async def delete_invoice(invoice_id: str) -> dict:
+    """Remove uma nota fiscal e payables vinculados."""
+    # Deletar payables vinculados primeiro (exclusão em cascata)
+    supabase.table("payables").delete().eq("invoice_id", invoice_id).execute()
+    # Deletar invoice
+    supabase.table("invoices").delete().eq("id", invoice_id).execute()
+    return {"success": True}
