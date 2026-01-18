@@ -150,3 +150,99 @@ async def delete_invoice(invoice_id: str) -> dict:
     """Remove uma nota fiscal."""
     supabase.table("invoices").delete().eq("id", invoice_id).execute()
     return {"success": True}
+
+
+@router.post("/upload-image")
+async def upload_image(
+    file: UploadFile = File(...),
+    company_id: str = Query(...),
+    project_id: Optional[str] = None,
+    current_user: dict = Depends(get_current_user)
+) -> dict:
+    """
+    Faz upload de imagem/PDF de NF-e e processa via OCR.
+    """
+    from ...core.ocr_service import process_receipt_image
+    import uuid
+    
+    # Blindagem Multi-tenant
+    if not current_user.get("is_developer") and current_user.get("company_id") != company_id:
+        raise HTTPException(status_code=403, detail="Acesso negado para realizar upload nesta empresa.")
+    
+    # Verificar tipo de arquivo
+    allowed_types = ['image/jpeg', 'image/png', 'image/webp', 'application/pdf']
+    if file.content_type not in allowed_types:
+        raise HTTPException(status_code=400, detail="Arquivo deve ser imagem (JPEG, PNG, WebP) ou PDF")
+    
+    try:
+        # Ler arquivo
+        content = await file.read()
+        
+        # Processar PDF se necessário
+        if file.content_type == 'application/pdf':
+            from pdf2image import convert_from_bytes
+            from io import BytesIO
+            images = convert_from_bytes(content)
+            if images:
+                img_buffer = BytesIO()
+                images[0].save(img_buffer, format='JPEG')
+                content = img_buffer.getvalue()
+        
+        # Salvar imagem no Storage
+        file_ext = 'jpg' if file.content_type == 'application/pdf' else file.filename.split('.')[-1]
+        file_name = f"{company_id}/invoices/{uuid.uuid4()}.{file_ext}"
+        storage_result = supabase.storage.from_("invoices").upload(file_name, content)
+        
+        # Obter URL pública
+        image_url = supabase.storage.from_("invoices").get_public_url(file_name)
+        
+        # Processar via OCR (reutilizando serviço de receipts mas com prompt adaptado)
+        ocr_result = await process_receipt_image(content)
+        
+        # Criar registro da invoice
+        invoice_data = {
+            "company_id": company_id,
+            "project_id": project_id,
+            "image_url": image_url,
+            "number": ocr_result.get("document_number", ""),
+            "supplier_cnpj": ocr_result.get("establishment_cnpj", ""),
+            "supplier_name": ocr_result.get("establishment_name", ""),
+            "issue_date": ocr_result.get("receipt_date"),
+            "total_value": ocr_result.get("total_amount", 0),
+            "ocr_status": "processed",
+            "ocr_confidence": ocr_result.get("confidence", 0),
+            "ocr_raw_response": ocr_result,
+            "status": "pending_validation"
+        }
+        
+        invoice_result = supabase.table("invoices").insert(invoice_data).execute()
+        invoice = invoice_result.data[0]
+        
+        # Criar payable automaticamente se tiver valor
+        if ocr_result.get("total_amount") and ocr_result.get("total_amount") > 0:
+            payable_data = {
+                "company_id": company_id,
+                "project_id": project_id,
+                "invoice_id": invoice['id'],
+                "description": f"NF {ocr_result.get('document_number', 'OCR')} - {ocr_result.get('establishment_name', 'N/I')}",
+                "supplier_name": ocr_result.get("establishment_name", ""),
+                "supplier_cnpj": ocr_result.get("establishment_cnpj"),
+                "due_date": ocr_result.get("receipt_date"),
+                "amount": ocr_result.get("total_amount"),
+                "status": "pending"
+            }
+            supabase.table("payables").insert(payable_data).execute()
+        
+        return {
+            "success": True,
+            "invoice_id": invoice['id'],
+            "image_url": image_url,
+            "ocr_result": ocr_result,
+            "ocr_confidence": ocr_result.get("confidence", 0)
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Erro ao processar imagem: {str(e)}")
+

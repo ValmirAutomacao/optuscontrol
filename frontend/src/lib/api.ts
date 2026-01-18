@@ -69,6 +69,31 @@ export async function uploadInvoiceXML(file: File, companyId: string, projectId?
     })
 }
 
+export async function uploadInvoiceImage(file: File, companyId: string, token?: string, projectId?: string) {
+    const formData = new FormData()
+    formData.append('file', file)
+
+    let url = `/invoices/upload-image?company_id=${companyId}`
+    if (projectId) url += `&project_id=${projectId}`
+
+    const headers: HeadersInit = {}
+    if (token) {
+        headers['Authorization'] = `Bearer ${token}`
+    }
+
+    return apiRequest<{
+        success: boolean
+        invoice_id: string
+        image_url: string
+        ocr_result?: Record<string, unknown>
+        ocr_confidence?: number
+    }>(url, {
+        method: 'POST',
+        body: formData,
+        headers,
+    })
+}
+
 export async function listInvoices(companyId: string) {
     return apiRequest<Record<string, unknown>[]>(`/invoices?company_id=${companyId}`)
 }

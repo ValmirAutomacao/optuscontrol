@@ -11,7 +11,8 @@ import {
     FolderKanban,
     TrendingUp,
     ShieldCheck,
-    Users
+    Users,
+    Download
 } from 'lucide-react'
 import { useAuth } from '../../hooks/useAuth'
 import { usePermissions } from '../../hooks/usePermissions'
@@ -26,6 +27,7 @@ const menuItems = [
     { icon: TrendingUp, label: 'Medições', path: '/measurements', module: 'projects' },
     { icon: Wallet, label: 'Contas a Pagar', path: '/payables', module: 'payables' },
     { icon: Tags, label: 'Categorias', path: '/categories', module: 'receipts' },
+    { icon: Download, label: 'Exportar', path: '/export', module: 'receipts' },
     { icon: Users, label: 'Gestão de Acessos', path: '/users', module: 'users' },
 ]
 
