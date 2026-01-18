@@ -22,17 +22,41 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     useEffect(() => {
         // Get initial session
-        supabase.auth.getSession().then(({ data: { session } }) => {
-            setSession(session)
-            setUser(session?.user ?? null)
+        supabase.auth.getSession().then(({ data: { session }, error }) => {
+            if (error) {
+                console.error('Error getting session:', error.message)
+                // Se houver erro de refresh token, limpar sessão
+                if (error.message.includes('Refresh Token')) {
+                    setSession(null)
+                    setUser(null)
+                }
+            } else {
+                setSession(session)
+                setUser(session?.user ?? null)
+            }
+            setLoading(false)
+        }).catch(err => {
+            console.error('Session error:', err)
+            setSession(null)
+            setUser(null)
             setLoading(false)
         })
 
         // Listen for auth changes
         const { data: { subscription } } = supabase.auth.onAuthStateChange(
-            (_event, session) => {
-                setSession(session)
-                setUser(session?.user ?? null)
+            (event, session) => {
+                // Se a sessão expirou ou houve erro de token, limpar
+                if (event === 'TOKEN_REFRESHED' && !session) {
+                    console.log('Token refresh failed, clearing session')
+                    setSession(null)
+                    setUser(null)
+                } else if (event === 'SIGNED_OUT') {
+                    setSession(null)
+                    setUser(null)
+                } else {
+                    setSession(session)
+                    setUser(session?.user ?? null)
+                }
                 setLoading(false)
             }
         )
@@ -57,8 +81,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
 
     const signOut = async () => {
-        const { error } = await supabase.auth.signOut()
-        if (error) throw error
+        try {
+            const { error } = await supabase.auth.signOut()
+            if (error) {
+                console.error('Sign out error:', error.message)
+            }
+        } catch (err) {
+            console.error('Sign out exception:', err)
+        }
+        // Sempre limpar estado local, mesmo se houver erro
+        setSession(null)
+        setUser(null)
     }
 
     return (
