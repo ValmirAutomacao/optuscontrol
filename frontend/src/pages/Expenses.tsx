@@ -16,6 +16,13 @@ interface ExpenseItem {
     ocr_confidence: number
     is_validated: boolean
     category_id: string
+    // Novos campos
+    document_type: string
+    document_number: string
+    access_key: string
+    payment_method: string
+    payment_type: string
+    installments: number
     ocr_raw_response: {
         payment_method?: string
         items?: Array<{ description: string; quantity: number; total: number }>
@@ -126,7 +133,8 @@ export function Expenses() {
 
     const filteredExpenses = expenses.filter(e =>
         e.establishment_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        e.establishment_cnpj?.includes(searchTerm)
+        e.establishment_cnpj?.includes(searchTerm) ||
+        e.document_number?.includes(searchTerm)
     )
 
     const stats = {
@@ -137,6 +145,28 @@ export function Expenses() {
     }
 
     const getCategoryName = (id: string) => categories.find(c => c.id === id)?.name || '-'
+
+    const getDocTypeLabel = (type: string) => {
+        const types: Record<string, string> = {
+            'nfce': 'NFC-e',
+            'nfe': 'NF-e',
+            'recibo': 'Recibo',
+            'comprovante': 'Comprovante',
+            'outro': 'Outro'
+        }
+        return types[type] || type || '-'
+    }
+
+    const getPaymentLabel = (method: string) => {
+        const methods: Record<string, string> = {
+            'pix': 'PIX',
+            'dinheiro': 'Dinheiro',
+            'credito': 'Crédito',
+            'debito': 'Débito',
+            'boleto': 'Boleto'
+        }
+        return methods[method] || method || '-'
+    }
 
     return (
         <div className="page-container">
@@ -182,10 +212,11 @@ export function Expenses() {
                     <table className="data-table">
                         <thead>
                             <tr>
+                                <th>Tipo</th>
                                 <th>Estabelecimento</th>
-                                <th>CNPJ</th>
+                                <th>Nº Doc</th>
                                 <th>Data</th>
-                                <th>Categoria</th>
+                                <th>Pagamento</th>
                                 <th>Valor</th>
                                 <th>Status</th>
                                 <th>Ações</th>
@@ -194,10 +225,11 @@ export function Expenses() {
                         <tbody>
                             {filteredExpenses.map((expense) => (
                                 <tr key={expense.id} className="clickable-row" onClick={() => setSelectedExpense(expense)}>
+                                    <td><span className={`doc-type-badge doc-type-badge--${expense.document_type || 'outro'}`}>{getDocTypeLabel(expense.document_type)}</span></td>
                                     <td className="font-medium">{expense.establishment_name || 'Não identificado'}</td>
-                                    <td className="text-muted">{expense.establishment_cnpj || '-'}</td>
+                                    <td className="text-muted">{expense.document_number || '-'}</td>
                                     <td>{expense.receipt_date ? new Date(expense.receipt_date).toLocaleDateString('pt-BR') : '-'}</td>
-                                    <td>{getCategoryName(expense.category_id)}</td>
+                                    <td>{getPaymentLabel(expense.payment_method)}</td>
                                     <td className="font-medium">R$ {Number(expense.total_amount || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</td>
                                     <td>
                                         {expense.is_validated ? (
@@ -236,10 +268,13 @@ export function Expenses() {
                                     {selectedExpense.image_url && <img src={selectedExpense.image_url} alt="Despesa" />}
                                 </div>
                                 <div className="detail-info">
+                                    <div className="detail-row"><span className="detail-label">Tipo:</span><span className="detail-value"><span className={`doc-type-badge doc-type-badge--${selectedExpense.document_type || 'outro'}`}>{getDocTypeLabel(selectedExpense.document_type)}</span></span></div>
+                                    <div className="detail-row"><span className="detail-label">Nº Documento:</span><span className="detail-value">{selectedExpense.document_number || '-'}</span></div>
                                     <div className="detail-row"><span className="detail-label">Estabelecimento:</span><span className="detail-value">{selectedExpense.establishment_name || 'Não identificado'}</span></div>
                                     <div className="detail-row"><span className="detail-label">CNPJ:</span><span className="detail-value">{selectedExpense.establishment_cnpj || '-'}</span></div>
                                     <div className="detail-row"><span className="detail-label">Data:</span><span className="detail-value">{selectedExpense.receipt_date ? new Date(selectedExpense.receipt_date).toLocaleDateString('pt-BR') : '-'}</span></div>
-                                    <div className="detail-row"><span className="detail-label">Forma Pagamento:</span><span className="detail-value">{selectedExpense.ocr_raw_response?.payment_method || '-'}</span></div>
+                                    <div className="detail-row"><span className="detail-label">Forma Pagamento:</span><span className="detail-value">{getPaymentLabel(selectedExpense.payment_method)}</span></div>
+                                    <div className="detail-row"><span className="detail-label">Tipo Pagamento:</span><span className="detail-value">{selectedExpense.payment_type === 'parcelado' ? `Parcelado (${selectedExpense.installments}x)` : 'À Vista'}</span></div>
                                     <div className="detail-row"><span className="detail-label">Categoria:</span><span className="detail-value">{getCategoryName(selectedExpense.category_id)}</span></div>
                                     <div className="detail-row"><span className="detail-label">Valor Total:</span><span className="detail-value font-bold">R$ {Number(selectedExpense.total_amount || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span></div>
                                     <div className="detail-row"><span className="detail-label">Confiança OCR:</span><span className="detail-value">{(Number(selectedExpense.ocr_confidence) * 100).toFixed(0)}%</span></div>

@@ -254,9 +254,46 @@
 }
 
 .modal-wide {
-    max-width: 95vw;
-    width: 95vw;
-    max-height: 95vh;
+    max-width: 900px;
+    width: 90vw;
+    max-height: 90vh;
+}
+
+/* Document Type Badges */
+.doc-type-badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 4px 10px;
+    border-radius: var(--radius-md);
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+}
+
+.doc-type-badge--nfce {
+    background: rgba(67, 97, 238, 0.15);
+    color: var(--primary-blue);
+}
+
+.doc-type-badge--nfe {
+    background: rgba(16, 185, 129, 0.15);
+    color: var(--success-green);
+}
+
+.doc-type-badge--recibo {
+    background: rgba(245, 158, 11, 0.15);
+    color: var(--warning-orange);
+}
+
+.doc-type-badge--comprovante {
+    background: rgba(139, 92, 246, 0.15);
+    color: #8b5cf6;
+}
+
+.doc-type-badge--outro {
+    background: rgba(107, 114, 128, 0.15);
+    color: var(--text-muted);
 }
 
 .modal-small {
