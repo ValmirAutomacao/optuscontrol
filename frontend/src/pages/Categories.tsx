@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { Plus, Edit, Trash2, X } from 'lucide-react'
 import { supabase } from '../lib/supabase'
+import { usePermissions } from '../hooks/usePermissions'
 import './Categories.css'
 
 interface Category {
@@ -27,6 +28,7 @@ const iconOptions = [
 ]
 
 export function Categories() {
+    const { activeCompanyId } = usePermissions()
     const [categories, setCategories] = useState<Category[]>([])
     const [loading, setLoading] = useState(true)
     const [showAddModal, setShowAddModal] = useState(false)
@@ -61,7 +63,7 @@ export function Categories() {
                 name: formData.name,
                 description: formData.description,
                 icon: formData.icon,
-                company_id: COMPANY_ID,
+                company_id: activeCompanyId || '',
                 is_system: false,
                 is_active: true
             })
