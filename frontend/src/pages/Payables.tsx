@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { Wallet, Plus, Calendar, AlertCircle, CheckCircle } from 'lucide-react'
 import { supabase } from '../lib/supabase'
+import { usePermissions } from '../hooks/usePermissions'
 import './Payables.css'
 
 interface Payable {
@@ -14,19 +15,24 @@ interface Payable {
 }
 
 export function Payables() {
+    const { activeCompanyId } = usePermissions()
     const [payables, setPayables] = useState<Payable[]>([])
     const [loading, setLoading] = useState(true)
     const [filter, setFilter] = useState<'all' | 'pending' | 'paid' | 'overdue'>('all')
 
     useEffect(() => {
-        fetchPayables()
-    }, [])
+        if (activeCompanyId) {
+            fetchPayables()
+        }
+    }, [activeCompanyId])
 
     async function fetchPayables() {
+        if (!activeCompanyId) return
         try {
             const { data, error } = await supabase
                 .from('payables')
                 .select('*')
+                .eq('company_id', activeCompanyId)
                 .order('due_date', { ascending: true })
 
             if (error) throw error
