@@ -23,7 +23,23 @@ async function apiRequest<T>(
 
         if (!response.ok) {
             const errorData = await response.json().catch(() => ({}))
-            return { error: errorData.detail || `Erro ${response.status}` }
+            // Tratar diferentes formatos de erro
+            let errorMessage = `Erro ${response.status}`
+
+            if (typeof errorData.detail === 'string') {
+                errorMessage = errorData.detail
+            } else if (Array.isArray(errorData.detail)) {
+                // Erros de validação Pydantic retornam array de objetos {type, loc, msg, input}
+                errorMessage = errorData.detail.map((e: { msg?: string; loc?: string[] }) =>
+                    e.msg || JSON.stringify(e)
+                ).join(', ')
+            } else if (errorData.detail?.msg) {
+                errorMessage = errorData.detail.msg
+            } else if (errorData.message) {
+                errorMessage = errorData.message
+            }
+
+            return { error: errorMessage }
         }
 
         const data = await response.json()
