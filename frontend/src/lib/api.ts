@@ -94,6 +94,10 @@ export async function uploadInvoiceImage(file: File, companyId: string, token?: 
     })
 }
 
+export async function deleteInvoice(invoiceId: string) {
+    return apiRequest<{ success: boolean }>(`/invoices/${invoiceId}`, { method: 'DELETE' })
+}
+
 export async function listInvoices(companyId: string) {
     return apiRequest<Record<string, unknown>[]>(`/invoices?company_id=${companyId}`)
 }

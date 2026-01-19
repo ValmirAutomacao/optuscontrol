@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { FileText, Upload, Search, Filter, Eye, Edit, Trash2, X } from 'lucide-react'
+import { FileText, Upload, Search, Filter, Eye, Edit, Trash2, X, CheckCircle } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { UploadInvoiceModal } from '../components/modals/UploadInvoiceModal'
 import { usePermissions } from '../hooks/usePermissions'
@@ -56,12 +56,32 @@ export function Invoices() {
 
     async function handleDelete(id: string) {
         try {
-            await supabase.from('invoices').delete().eq('id', id)
+            // Usar API backend para delete em cascata (remove payables vinculados)
+            const { deleteInvoice } = await import('../lib/api')
+            const response = await deleteInvoice(id)
+            if (response.error) {
+                console.error('Erro ao excluir:', response.error)
+                alert('Erro ao excluir nota fiscal')
+                return
+            }
             fetchInvoices()
             setShowDeleteConfirm(null)
             setSelectedInvoice(null)
         } catch (error) {
             console.error('Erro ao excluir:', error)
+            alert('Erro ao excluir nota fiscal')
+        }
+    }
+
+    async function handleApprove(id: string) {
+        try {
+            await supabase
+                .from('invoices')
+                .update({ status: 'processed' })
+                .eq('id', id)
+            fetchInvoices()
+        } catch (error) {
+            console.error('Erro ao aprovar:', error)
         }
     }
 
@@ -163,6 +183,11 @@ export function Invoices() {
                                     </td>
                                     <td onClick={(e) => e.stopPropagation()}>
                                         <div className="action-buttons">
+                                            {invoice.status === 'pending_validation' && (
+                                                <button className="btn-icon btn-icon--success" onClick={() => handleApprove(invoice.id)} title="Aprovar">
+                                                    <CheckCircle size={18} />
+                                                </button>
+                                            )}
                                             <button className="btn-icon" onClick={() => setSelectedInvoice(invoice)} title="Visualizar"><Eye size={18} /></button>
                                             <button className="btn-icon" onClick={() => setEditingInvoice(invoice)} title="Editar"><Edit size={18} /></button>
                                             <button className="btn-icon btn-icon--danger" onClick={() => setShowDeleteConfirm(invoice.id)} title="Excluir"><Trash2 size={18} /></button>
