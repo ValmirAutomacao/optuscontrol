@@ -23,8 +23,8 @@ Retorne EXATAMENTE neste formato JSON (sem texto adicional):
   "document_type": "nfce",
   "document_number": "000013330",
   "access_key": null,
-  "establishment_name": "Nome do estabelecimento",
-  "establishment_cnpj": "XX.XXX.XXX/XXXX-XX",
+  "establishment_name": "Nome do EMITENTE/REMETENTE (quem vendeu/forneceu)",
+  "establishment_cnpj": "CNPJ do EMITENTE",
   "receipt_date": "YYYY-MM-DD",
   "total_amount": 0.00,
   "items": [
@@ -54,6 +54,14 @@ Instruções IMPORTANTES:
   * Se não encontrar, use null
   
 - access_key: chave de acesso de 44 dígitos (se houver, geralmente em NFC-e/NF-e)
+
+- CRÍTICO para establishment_name e establishment_cnpj:
+  * Em NF-e/NFC-e existem dois atores: EMITENTE (quem vende/fornece) e DESTINATÁRIO (quem compra/recebe)
+  * Você DEVE extrair os dados do EMITENTE/REMETENTE (fornecedor), NÃO do destinatário
+  * O EMITENTE geralmente aparece no TOPO do documento, com logo e dados completos
+  * O DESTINATÁRIO aparece depois, como "DESTINATÁRIO / REMETENTE" ou similar
+  * Exemplo: Se "Antonio Ozório" aparece no topo e "2P Engenharia" como destinatário,
+    você deve retornar establishment_name = "Antonio Ozório" (o fornecedor)
 
 - payment_method: forma de pagamento usada
   * "pix" = PIX, Pagamento Instantâneo

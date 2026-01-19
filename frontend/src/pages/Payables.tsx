@@ -19,6 +19,7 @@ export function Payables() {
     const [payables, setPayables] = useState<Payable[]>([])
     const [loading, setLoading] = useState(true)
     const [filter, setFilter] = useState<'all' | 'pending' | 'paid' | 'overdue'>('all')
+    const [processingId, setProcessingId] = useState<string | null>(null)
 
     useEffect(() => {
         if (activeCompanyId) {
@@ -41,6 +42,30 @@ export function Payables() {
             console.error('Erro ao buscar contas:', error)
         } finally {
             setLoading(false)
+        }
+    }
+
+    async function handleMarkAsPaid(payableId: string) {
+        if (!confirm('Confirma que esta conta foi paga?')) return
+
+        setProcessingId(payableId)
+        try {
+            const today = new Date().toISOString().split('T')[0]
+            const { error } = await supabase
+                .from('payables')
+                .update({
+                    status: 'paid',
+                    payment_date: today
+                })
+                .eq('id', payableId)
+
+            if (error) throw error
+            fetchPayables() // Recarregar lista
+        } catch (error) {
+            console.error('Erro ao marcar como pago:', error)
+            alert('Erro ao marcar como pago')
+        } finally {
+            setProcessingId(null)
         }
     }
 
@@ -162,7 +187,13 @@ export function Payables() {
                                             <CheckCircle size={16} /> Pago
                                         </span>
                                     ) : (
-                                        <button className="btn-pay">Pagar</button>
+                                        <button
+                                            className="btn-pay"
+                                            onClick={() => handleMarkAsPaid(payable.id)}
+                                            disabled={processingId === payable.id}
+                                        >
+                                            {processingId === payable.id ? 'Salvando...' : 'Pagar'}
+                                        </button>
                                     )}
                                 </div>
                             </div>
